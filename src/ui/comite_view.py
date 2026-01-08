@@ -65,6 +65,7 @@ def mostrar_vista_comite():
         
         crear_boton_logout()
 
+    
     paginas_sin_evaluaciones = ["Administración", "Gestión de Usuarios"]
     
     # Si la página requiere evaluaciones y no hay, mostrar aviso
@@ -99,7 +100,7 @@ def mostrar_vista_comite():
     elif pagina == "Administración":
         mostrar_panel_admin()
     elif pagina == "Gestión de Usuarios":
-        mostrar_gestion_usuarios()
+        mostrar_gestion_usuarios(df_eval)
 
 def mostrar_dashboard(df_eval: pd.DataFrame):
     """Dashboard general con KPIs y gráficos principales"""
@@ -628,7 +629,7 @@ def mostrar_panel_admin():
 # AGREGAR ESTA FUNCIÓN A src/ui/comite_view.py
 # ═══════════════════════════════════════════════════════════
 
-def mostrar_gestion_usuarios():
+def mostrar_gestion_usuarios(df_eval: pd.DataFrame):
     """Panel de gestión completa de usuarios"""
     from src.database.models import UsuarioModel, LogModel
     import bcrypt
@@ -636,6 +637,7 @@ def mostrar_gestion_usuarios():
     st.header("👥 Gestión de Usuarios")
     st.caption("Administración de curadores y miembros del comité")
     st.button("🔄️ Actualizar")
+    st.dataframe(df_eval.head())
 
 
     
