@@ -67,8 +67,22 @@ def mostrar_vista_comite():
         )
         
         crear_boton_logout()
-        
+
+    paginas_sin_evaluaciones = ["Administración", "Gestión de Usuarios"]
     
+    # Si la página requiere evaluaciones y no hay, mostrar aviso
+    if pagina not in paginas_sin_evaluaciones and df_eval.empty:
+        st.warning("⚠️ No hay evaluaciones registradas todavía")
+        st.info("Las evaluaciones aparecerán aquí una vez que los curadores comiencen a registrarlas")
+        st.markdown("---")
+        st.markdown("💡 **Mientras tanto, puedes:**")
+        st.markdown("- Ir a **⚙️ Administración** para sincronizar grupos")
+        st.markdown("- Ir a **👥 Gestión de Usuarios** para crear curadores")
+        return  # ← Cambio: return en lugar de st.stop() para que el sidebar siga funcionando   
+    
+
+
+
     # Routing según página seleccionada
     if pagina == "Dashboard General":
         mostrar_dashboard(df_eval)
