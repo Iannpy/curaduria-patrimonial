@@ -533,7 +533,7 @@ class EvaluacionModel:
                 """, (usuario_id, codigo_grupo))
                 
                 count = cursor.fetchone()[0]
-                return count >= 5
+                return count >= 3
                 
         except Exception as e:
             logger.error(f"Error verificando evaluación: {e}")
@@ -558,8 +558,8 @@ class EvaluacionModel:
                         e.observacion,
                         e.fecha_registro
                     FROM evaluaciones e
-                    JOIN usuarios u ON e.usuario_id = u.id
-                    JOIN grupos g ON e.codigo_grupo = g.codigo
+                    LEFT JOIN usuarios u ON e.usuario_id = u.id
+                    LEFT JOIN grupos g ON e.codigo_grupo = g.codigo
                     JOIN dimensiones d ON e.dimension_id = d.id
                     ORDER BY e.fecha_registro DESC
                 """

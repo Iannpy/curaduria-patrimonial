@@ -217,7 +217,7 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
     cantidad_modalidad = df_promedios[df_promedios['modalidad'] == seleccion_raw].shape[0]
         
     import math
-    cantidad_congos = math.ceil(cantidad_modalidad * 0.15)
+    cantidad_congos = int(math.ceil(cantidad_modalidad * 0.15))
     
     if cantidad_modalidad == 0:
         st.warning(f"⚠️ No hay grupos en la modalidad '{seleccion_raw}'")
@@ -560,7 +560,7 @@ def mostrar_panel_admin():
                             st.error("Esta opción eliminará TODAS las evaluaciones")
                             if st.checkbox("Confirmo que quiero eliminar todo"):
                                 cursor.execute("DELETE FROM evaluaciones")
-                                cursor.execute("DELETE FROM grupos")
+                                
                                 
                                 insertados = 0
                                 for _, row in df_excel.iterrows():
