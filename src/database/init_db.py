@@ -49,6 +49,35 @@ CREATE TABLE IF NOT EXISTS grupos (
 CREATE INDEX IF NOT EXISTS idx_grupos_modalidad ON grupos(modalidad);
 CREATE INDEX IF NOT EXISTS idx_grupos_ano ON grupos(ano_evento);
 
+-- =====================================================
+-- TABLA: fichas
+-- Tipos de fichas de evaluación
+-- =====================================================
+CREATE TABLE IF NOT EXISTS fichas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    codigo TEXT UNIQUE NOT NULL,
+    nombre TEXT NOT NULL,
+    descripcion TEXT
+);
+
+-- =====================================================
+-- TABLA: ficha_dimensiones
+-- Relación entre fichas y dimensiones
+-- =====================================================
+CREATE TABLE IF NOT EXISTS ficha_dimensiones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ficha_id INTEGER NOT NULL,
+    dimension_id INTEGER NOT NULL,
+    orden INTEGER NOT NULL,
+
+    FOREIGN KEY (ficha_id) REFERENCES fichas(id) ON DELETE CASCADE,
+    FOREIGN KEY (dimension_id) REFERENCES dimensiones(id) ON DELETE CASCADE,
+    UNIQUE (ficha_id, dimension_id),
+    CHECK (orden > 0)
+);
+
+-- Agregar columna a la tabla grupos
+ALTER TABLE grupos ADD COLUMN ficha_id INTEGER;
 
 -- =====================================================
 -- TABLA: dimensiones
@@ -90,24 +119,27 @@ CREATE INDEX IF NOT EXISTS idx_aspectos_orden ON aspectos(orden);
 
 -- =====================================================
 -- TABLA: evaluaciones
--- Registro de evaluaciones por aspecto
+-- Evaluaciones por ficha y aspecto
 -- =====================================================
 CREATE TABLE IF NOT EXISTS evaluaciones (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     usuario_id INTEGER NOT NULL,
     codigo_grupo TEXT NOT NULL,
+    ficha_id INTEGER NOT NULL,
     aspecto_id INTEGER NOT NULL,
-    resultado INTEGER CHECK(resultado IN (0, 1, 2)) NOT NULL,
+    resultado INTEGER CHECK (resultado IN (0,1,2)) NOT NULL,
     observacion TEXT NOT NULL,
     fecha_registro TEXT DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
     FOREIGN KEY (codigo_grupo) REFERENCES grupos(codigo) ON DELETE CASCADE,
+    FOREIGN KEY (ficha_id) REFERENCES fichas(id) ON DELETE CASCADE,
     FOREIGN KEY (aspecto_id) REFERENCES aspectos(id) ON DELETE CASCADE,
 
-    UNIQUE(usuario_id, codigo_grupo, aspecto_id),
-    CHECK(length(observacion) >= 20)
+    UNIQUE (usuario_id, codigo_grupo, ficha_id, aspecto_id),
+    CHECK (length(observacion) >= 20)
 );
+
 
 CREATE INDEX IF NOT EXISTS idx_evaluaciones_aspecto ON evaluaciones(aspecto_id);
 
@@ -167,6 +199,21 @@ DIMENSIONES_INICIALES = [
     }
 ]
 
+FICHAS_INICIALES = [
+    ("CUMBIA", "Ficha Cumbia", "Modalidad Cumbia"),
+    ("CONGO_GARABATO", "Ficha Congo y Garabato", "Danza Tradicional"),
+    ("SON_NEGRO", "Ficha Son de Negro y Mapalé", "Danza Tradicional"),
+    ("COMPARSA", "Ficha Comparsa", "Comparsa"),
+    ("DANZAS_EX", "Ficha Danzas ex", "Danza de Relación, Danza Especial y Expresiones Invitadas")
+]
+FICHA_DIMENSIONES = {
+    "CUMBIA": ["DIM1", "DIM2", "DIM3"],
+    "CONGO_GARABATO": ["DIM1", "DIM2", "DIM3"],
+    "SON_NEGRO": ["DIM1", "DIM2", "DIM3"],
+    "COMPARSA": ["DIM1", "DIM2", "DIM3", "DIM4"],
+    "DANZAS_EX": ["DIM2", "DIM3", "DIM5"]
+}
+
 
 
 def inicializar_base_datos() -> bool:
@@ -217,6 +264,43 @@ def inicializar_base_datos() -> bool:
                 logger.info("Dimensiones y aspectos iniciales insertados correctamente")
             else:
                 logger.info(f"Las dimensiones ya existen ({count_dimensiones} registros)")
+        
+            # ---------- FICHAS ----------
+            cursor.execute("SELECT COUNT(*) FROM fichas")
+            if cursor.fetchone()[0] == 0:
+                cursor.executemany(
+                    "INSERT INTO fichas (codigo, nombre, descripcion) VALUES (?, ?, ?)",
+                    FICHAS_INICIALES
+                )
+                logger.info("Fichas iniciales insertadas")
+
+            # ---------- FICHA_DIMENSIONES ----------
+            cursor.execute("SELECT COUNT(*) FROM ficha_dimensiones")
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("SELECT id, codigo FROM fichas")
+                fichas_map = {codigo: id_ for id_, codigo in cursor.fetchall()}
+
+                cursor.execute("SELECT id, codigo FROM dimensiones")
+                dimensiones_map = {codigo: id_ for id_, codigo in cursor.fetchall()}
+
+                for ficha_codigo, dims in FICHA_DIMENSIONES.items():
+                    ficha_id = fichas_map[ficha_codigo]
+                    for orden, dim_codigo in enumerate(dims, start=1):
+                        cursor.execute(
+                            """INSERT INTO ficha_dimensiones (ficha_id, dimension_id, orden)
+                            VALUES (?, ?, ?)""",
+                            (ficha_id, dimensiones_map[dim_codigo], orden)
+                        )
+
+                logger.info("Relación ficha-dimensiones creada")
+
+            conn.commit()
+
+        
+        
+        
+        
+        
         
         logger.info("Base de datos inicializada correctamente")
         return True
