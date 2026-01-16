@@ -45,9 +45,11 @@ def mostrar_vista_comite():
                 "Dashboard General",
                 "Evaluaciones Detalladas",
                 "Análisis por Grupos",
+                "Análisis por Ficha",
                 "Análisis por Dimensión",
                 "Análisis por Aspecto",
                 "Análisis por Curador",
+                "Gestión de Fichas",
                 "Administración",
                 "Gestión de Usuarios"
             ],
@@ -55,6 +57,8 @@ def mostrar_vista_comite():
                 "bar-chart-fill",
                 "table",
                 "people-fill",
+                "layers-fill",
+                "layers-fill",
                 "layers-fill",
                 "check2-square",
                 "person-badge-fill",
@@ -68,7 +72,7 @@ def mostrar_vista_comite():
         
         crear_boton_logout()
     
-    paginas_sin_evaluaciones = ["Administración", "Gestión de Usuarios"]
+    paginas_sin_evaluaciones = ["Administración", "Gestión de Usuarios","Gestión de Fichas"]
     
     # Si la página requiere evaluaciones y no hay, mostrar aviso
     if pagina not in paginas_sin_evaluaciones and df_eval.empty:
@@ -97,6 +101,11 @@ def mostrar_vista_comite():
         mostrar_panel_admin()
     elif pagina == "Gestión de Usuarios":
         mostrar_gestion_usuarios(df_eval)
+    elif pagina == "Análisis por Ficha":
+        mostrar_analisis_por_ficha(df_eval)
+    elif pagina == "Gestión de Fichas":
+        from src.ui.admin_fichas_view import mostrar_gestion_fichas
+        mostrar_gestion_fichas()
 
 
 def mostrar_dashboard(df_eval: pd.DataFrame):
@@ -574,6 +583,203 @@ def mostrar_analisis_aspectos(df_eval: pd.DataFrame):
             hide_index=True
         )
 
+"""
+Agregar esta función a comite_view.py
+Insertar después de mostrar_analisis_aspectos()
+"""
+
+def mostrar_analisis_por_ficha(df_eval: pd.DataFrame):
+    """Análisis detallado por tipo de ficha"""
+    
+    st.header("🎭 Análisis por Ficha")
+    st.caption("Desempeño consolidado por tipo de ficha de evaluación")
+    
+    # Verificar que haya columna ficha
+    if 'ficha' not in df_eval.columns:
+        st.warning("⚠️ No hay información de fichas en las evaluaciones")
+        return
+    
+    # Estadísticas generales por ficha
+    from src.database.models import EvaluacionModel
+    df_stats_ficha = EvaluacionModel.obtener_estadisticas_por_ficha()
+    
+    if df_stats_ficha.empty:
+        st.info("No hay evaluaciones registradas por ficha todavía")
+        return
+    
+    # KPIs
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        total_fichas = len(df_stats_ficha)
+        st.metric("Total Fichas Activas", total_fichas)
+    
+    with col2:
+        ficha_mejor = df_stats_ficha.nlargest(1, 'promedio_general')
+        if not ficha_mejor.empty:
+            st.metric(
+                "Ficha con Mejor Desempeño",
+                ficha_mejor.iloc[0]['ficha'],
+                f"{ficha_mejor.iloc[0]['promedio_general']:.2f}"
+            )
+    
+    with col3:
+        total_grupos = df_stats_ficha['grupos_evaluados'].sum()
+        st.metric("Total Grupos Evaluados", int(total_grupos))
+    
+    st.markdown("---")
+    
+    # Gráfico comparativo de fichas
+    st.subheader("📊 Comparativa de Fichas")
+    
+    chart = alt.Chart(df_stats_ficha).mark_bar().encode(
+        y=alt.Y('ficha:N', title='Ficha', sort='-x'),
+        x=alt.X('promedio_general:Q', title='Promedio General', scale=alt.Scale(domain=[0, 2])),
+        color=alt.Color(
+            'promedio_general:Q',
+            scale=alt.Scale(
+                domain=[0, 0.67, 1.33, 2],
+                range=['#d73027', '#fee08b', '#d9ef8b', '#1a9850']
+            ),
+            legend=None
+        ),
+        tooltip=[
+            'ficha',
+            alt.Tooltip('promedio_general:Q', format='.2f', title='Promedio'),
+            alt.Tooltip('grupos_evaluados:Q', title='Grupos'),
+            alt.Tooltip('total_evaluaciones:Q', title='Evaluaciones')
+        ]
+    ).properties(height=max(300, len(df_stats_ficha) * 40))
+    
+    st.altair_chart(chart, use_container_width=True)
+    
+    # Tabla detallada
+    st.subheader("📋 Detalle por Ficha")
+    
+    # Formatear columnas
+    df_display = df_stats_ficha.copy()
+    df_display['promedio_general'] = df_display['promedio_general'].apply(lambda x: f"{x:.2f}")
+    
+    st.dataframe(
+        df_display,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            'ficha': 'Ficha',
+            'grupos_evaluados': st.column_config.NumberColumn('Grupos', format='%d'),
+            'curadores': st.column_config.NumberColumn('Curadores', format='%d'),
+            'total_evaluaciones': st.column_config.NumberColumn('Evaluaciones', format='%d'),
+            'promedio_general': 'Promedio',
+            'fortalezas': st.column_config.NumberColumn('🟢 Fortalezas', format='%d'),
+            'oportunidades': st.column_config.NumberColumn('🟡 Oportunidades', format='%d'),
+            'riesgos': st.column_config.NumberColumn('🔴 Riesgos', format='%d')
+        }
+    )
+    
+    st.markdown("---")
+    
+    # Análisis detallado por ficha seleccionada
+    st.subheader("🔍 Análisis Detallado por Ficha")
+    
+    fichas_disponibles = df_stats_ficha['ficha'].tolist()
+    ficha_seleccionada = st.selectbox("Seleccionar ficha:", fichas_disponibles)
+    
+    if ficha_seleccionada:
+        # Filtrar evaluaciones de esta ficha
+        df_ficha = df_eval[df_eval['ficha'] == ficha_seleccionada]
+        
+        if df_ficha.empty:
+            st.warning(f"No hay evaluaciones para la ficha '{ficha_seleccionada}'")
+        else:
+            col_info1, col_info2, col_info3 = st.columns(3)
+            
+            with col_info1:
+                grupos_ficha = df_ficha['codigo_grupo'].nunique()
+                st.metric("Grupos Evaluados", grupos_ficha)
+            
+            with col_info2:
+                promedio_ficha = df_ficha['resultado'].mean()
+                st.metric("Promedio de Ficha", f"{promedio_ficha:.2f}")
+            
+            with col_info3:
+                evaluaciones_ficha = len(df_ficha)
+                st.metric("Total Evaluaciones", evaluaciones_ficha)
+            
+            # Análisis por dimensión dentro de la ficha
+            st.markdown("**Desempeño por Dimensión:**")
+            
+            df_dim_ficha = (df_ficha
+                .groupby('dimension', as_index=False)
+                .agg(
+                    promedio=('resultado', 'mean'),
+                    evaluaciones=('resultado', 'count')
+                )
+                .sort_values('promedio', ascending=False)
+            )
+            
+            chart_dim = alt.Chart(df_dim_ficha).mark_bar().encode(
+                x=alt.X('dimension:N', title='Dimensión'),
+                y=alt.Y('promedio:Q', title='Promedio', scale=alt.Scale(domain=[0, 2])),
+                color=alt.Color(
+                    'promedio:Q',
+                    scale=alt.Scale(
+                        domain=[0, 0.67, 1.33, 2],
+                        range=['#d73027', '#fee08b', '#d9ef8b', '#1a9850']
+                    ),
+                    legend=None
+                ),
+                tooltip=[
+                    'dimension',
+                    alt.Tooltip('promedio:Q', format='.2f'),
+                    'evaluaciones'
+                ]
+            ).properties(height=250)
+            
+            st.altair_chart(chart_dim, use_container_width=True)
+            
+            # Top grupos de esta ficha
+            st.markdown("**🏆 Top 5 Grupos de esta Ficha:**")
+            
+            df_grupos_ficha = (df_ficha
+                .groupby(['codigo_grupo', 'nombre_propuesta'], as_index=False)
+                .agg(promedio=('resultado', 'mean'))
+                .nlargest(5, 'promedio')
+            )
+            
+            st.dataframe(
+                df_grupos_ficha.style.format({'promedio': '{:.2f}'}),
+                use_container_width=True,
+                hide_index=True
+            )
+            
+            # Aspectos más fuertes y débiles de esta ficha
+            col_asp1, col_asp2 = st.columns(2)
+            
+            with col_asp1:
+                st.markdown("**🟢 Aspectos Más Fuertes:**")
+                df_asp_fuerte = (df_ficha
+                    .groupby('aspecto', as_index=False)
+                    .agg(promedio=('resultado', 'mean'))
+                    .nlargest(5, 'promedio')
+                )
+                st.dataframe(
+                    df_asp_fuerte.style.format({'promedio': '{:.2f}'}),
+                    use_container_width=True,
+                    hide_index=True
+                )
+            
+            with col_asp2:
+                st.markdown("**🔴 Aspectos a Fortalecer:**")
+                df_asp_debil = (df_ficha
+                    .groupby('aspecto', as_index=False)
+                    .agg(promedio=('resultado', 'mean'))
+                    .nsmallest(5, 'promedio')
+                )
+                st.dataframe(
+                    df_asp_debil.style.format({'promedio': '{:.2f}'}),
+                    use_container_width=True,
+                    hide_index=True
+                )
 
 def mostrar_analisis_curadores(df_eval: pd.DataFrame):
     """Análisis por curadores"""
