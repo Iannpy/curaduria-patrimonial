@@ -41,17 +41,12 @@ def bloque_aspecto(dimension_nombre: str, aspecto_nombre: str, key_prefix: str):
     Returns:
         Tupla (resultado, observacion)
     """
-    st.markdown(f"""
-    <div style="background-color: #f0f2f6; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-        <p style="margin: 0; color: #666; font-size: 13px;"><b></b></p>
-        <p style="margin: 5px 0 0 0; font-size: 16px; font-weight: bold;">{aspecto_nombre}</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col_resultado, col_obs = st.columns([1, 3])
+
+    col_resultado, col_obs = st.columns([3, 1])
     
     # Columna 1: Resultado
     with col_resultado:
+        """
         st.markdown("**Estado:**")
         resultado = st.selectbox(
             "Seleccione",
@@ -64,10 +59,28 @@ def bloque_aspecto(dimension_nombre: str, aspecto_nombre: str, key_prefix: str):
             }[x],
             label_visibility="collapsed"
         )
-    
+    """
+        st.markdown(f"""
+        <div style="background-color: #f0f2f6; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+            <p style="margin: 0; color: #666; font-size: 13px;"><b></b></p>
+            <p style="margin: 5px 0 0 0; font-size: 16px; font-weight: bold;">{aspecto_nombre}</p>
+        </div>
+        """, unsafe_allow_html=True)
     # Columna 2: Observación
     with col_obs:
-        st.markdown("**Observación cualitativa:**")
+        st.markdown("**Estado:**")
+        resultado = st.selectbox(
+            "Seleccione",
+            [2, 1, 0],
+            key=f"res_{key_prefix}",
+            format_func=lambda x: {
+                2: "🟢 Fortaleza",
+                1: "🟡 Oportunidad",
+                0: "🔴 Riesgo"
+            }[x],
+            label_visibility="collapsed"
+        )
+        #st.markdown("**Observación cualitativa:**")
         observacion= "Nan num nem"
         """
         observacion = st.text_area(
@@ -85,7 +98,7 @@ def bloque_aspecto(dimension_nombre: str, aspecto_nombre: str, key_prefix: str):
                 st.error(f"⚠️ {error}")
             #else:
                 #st.success(f"✓ {len(observacion)} caracteres")
-    
+    st.markdown("---")
     return resultado, observacion
 
 
@@ -323,7 +336,10 @@ def mostrar_vista_curador():
                         key_prefix=f"asp_{aspecto['id']}"
                     )
                     evaluaciones.append((aspecto['id'], resultado, observacion))
-            
+            st.markdown("**Observación Cualitativa:**")
+            st.text_area(label="")
+
+
             st.markdown("---")
             
             # Información de resumen antes de guardar
