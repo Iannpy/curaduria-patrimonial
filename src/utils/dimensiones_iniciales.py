@@ -85,7 +85,7 @@ DIMENSIONES_INICIALES = [
      "nombre": "Música - Congo",
      "orden": 5,
      "aspectos": [
-         "El grupo musical está compuesto por tambor alegre, la guacharaca tradicional del Congo. ",
+         "El grupo musical está compuesto por tambor alegre, la guacharaca tradicional del Congo",
          "Golpe de tambor"]
     },
 
@@ -132,7 +132,7 @@ DIMENSIONES_INICIALES = [
      "aspectos": [
          "El Sonido de la Flauta se interioriza y eleva la expresividad generando la altivez corporal y elegancia de la mujer",
          "En el hombre se muestran sentimientos de alegría expresados en comportamientos de Cortejo y conquista para con la mujer",
-         "Manejo del contacto visual (gestos, miradas y sonrisas) en pareja indicando el coqueteo y galanteo.Evitaquesuparejalatoque",
+         "Manejo del contacto visual (gestos, miradas y sonrisas) en pareja indicando el coqueteo y galanteo. Evita que supareja la toque",
          "Gritos/Güiros y expresiones de júbilo por parte de los participantes de la rueda para llamar la atención del momento vivido"]
     },
     {"codigo": "DIM12",
@@ -180,65 +180,65 @@ DIMENSIONES_INICIALES = [
      "orden": 17,
      "aspectos": [
          "La coreografía es libre y va de acuerdo al baile y al ritmo musical denominado “Mapalé”",
-         "Organización espacial"]
+         "En el baile tradicional no se presentan figuras ni elementos circenses."]
     },
     {"codigo": "DIM18",
      "nombre": "Vestuario y Parafernalia",
      "orden": 18,
      "aspectos": [
-         "Autenticidad cultural",
-         "Cuidado de los elementos"]
+         "Mujeres",
+         "Hombres"]
     },
     {"codigo": "DIM19",
-     "nombre": "Marcación del ritmo",
+     "nombre": "Marcación del ritmo - Mapalé",
      "orden": 19,
      "aspectos": [
-         "Regularidad del pulso",
-         "Relación música–movimiento"]
+         "Baile de los Hombres; los movimientos del cuerpo son rápidos y fuertes, se representan con contorciones, brincos y desplazamientos horizontales, en el paso del caimán tradicional de la danza, se apoyan sobre manos y pies",
+         "En el Baile de las mujeres, los sensuales movimientos de las caderas, la pelvis, los glúteos y la cintura pueden ser rápidos o lentos"]
     },
     {"codigo": "DIM20",
-     "nombre": "Música",
+     "nombre": "Música - Mapalé",
      "orden": 20,
      "aspectos": [
-         "Claridad en los golpes",
-         "Continuidad musical"]
+         "El grupo musical que acompaña a la danza está compuesto por un cantador y un coro, una tambora y tambores de un solo parche, acompañado de guache, maracas, flauta e' millo y palmas o tablitas. Puede o no llevar clarinete"]
     },
 
     # Grupo 5
     {"codigo": "DIM21",
-     "nombre": "Puesta en escena",
+     "nombre": "Expresiones corporales y faciales de burla exagerada",
      "orden": 21,
      "aspectos": [
          "Seguridad en la interpretación",
          "Comunicación escénica"]
     },
     {"codigo": "DIM22",
-     "nombre": "Coreografía",
+     "nombre": "Coreografía - Son de Negro",
      "orden": 22,
      "aspectos": [
          "Estructura del baile",
          "Precisión en los movimientos"]
     },
     {"codigo": "DIM23",
-     "nombre": "Vestuario y Parafernalia",
+     "nombre": "Vestuario y Parafernalia - Son de Negro",
      "orden": 23,
      "aspectos": [
-         "Unidad estética",
-         "Uso adecuado en la puesta en escena"]
+         "Mujeres",
+         "Hombres",
+         "Parafernalia y maquillaje"]
     },
     {"codigo": "DIM24",
-     "nombre": "Marcación del ritmo",
+     "nombre": "Marcación del ritmo - Son de Negro",
      "orden": 24,
      "aspectos": [
-         "Control del tiempo",
-         "Coherencia rítmica"]
+         "El baile de los hombres semeja convulsiones que se mezclan con expresiones rígidas",
+         "El baile de la mujer tiene movimientos de caderas y con los glúteos buscan golpear al hombre, este trata de evitar el contacto"]
     },
     {"codigo": "DIM25",
      "nombre": "Música",
      "orden": 25,
      "aspectos": [
          "Integración instrumental",
-         "Fuerza expresiva"]
+         'El tema distintivo de la danza del son de negro es la canción "La Rama de Tamarindo". Se interpreta con Tambor alegre, guacharaca o guache, claves, tablas o palmas']
     }
 ]
 
@@ -256,7 +256,7 @@ FICHA_DIMENSIONES_MAP = {
     'GARABATO': ['DIM6', 'DIM7', 'DIM8', 'DIM9', 'DIM10'],
     'CUMBIA': ['DIM11', 'DIM12', 'DIM13', 'DIM14'],
     'MAPALE': ['DIM16', 'DIM17', 'DIM18', 'DIM19', 'DIM20'],
-    'SON_NEGRO': ['DIM21', 'DIM22', 'DIM23', 'DIM24', 'DIM25'],
+    'SON_DE_NEGRO': ['DIM21', 'DIM22', 'DIM23', 'DIM24', 'DIM25'],
     'COMPARSA_TRAD': ['DIM1', 'DIM2', 'DIM3'],
     'COMPARSA_FANT': ['DIM1', 'DIM2', 'DIM3'],
     'DANZAS_ESP': ['DIM2', 'DIM3']  # Ejemplo: esta ficha no tiene DIM1
