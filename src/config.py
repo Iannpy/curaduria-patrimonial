@@ -25,7 +25,7 @@ for directory in [DATA_DIR, ASSETS_DIR, LOGS_DIR]:
 class UmbralesPatrimoniales:
     """Umbrales para clasificación patrimonial"""
     riesgo_max: float = 0.8
-    mejora_max: float = 1.59
+    mejora_max: float = 1.6
     
     emoji_riesgo: str = "🔴"
     emoji_mejora: str = "🟡"
@@ -47,7 +47,7 @@ class ConfiguracionApp:
     
     # Información del evento
     nombre_evento: str = field(default_factory=lambda: os.getenv("NOMBRE_EVENTO", "Fin de Semana de la Tradición"))
-    ano_evento: int = field(default_factory=lambda: int(os.getenv("ANO_EVENTO", "30000")))
+    ano_evento: int = field(default_factory=lambda: int(os.getenv("ANO_EVENTO", "2026")))
     fecha_evento: str = field(default_factory=lambda: os.getenv("FECHA_EVENTO", str(datetime.datetime.today().strftime("%d/%m/%Y"))))
     # Rutas de archivos
     db_path: str = field(default_factory=lambda: os.getenv("DB_PATH", str(DATA_DIR / "curaduria.db")))
@@ -61,37 +61,6 @@ class ConfiguracionApp:
     # Umbrales patrimoniales
     umbrales: UmbralesPatrimoniales = field(default_factory=UmbralesPatrimoniales)
     
-    # Dimensiones de evaluación
-    dimensiones: list = field(default_factory=lambda: [
-        (
-            "Dimensión 1 – Rigor en la ejecución tradicional",
-            [
-                "Coreografía / pasos básicos",
-                "Expresión dancística",
-                "Relación música – danza",
-                "Vestuario apropiado (incluye parafernalia)",
-                "Marcación del ritmo"
-            ]
-        ),
-        (
-            "Dimensión 2 – Transmisión del sentido cultural",
-            [
-                "Su identidad",
-                "Su narrativa",
-                "Su historia",
-                "El valor simbólico",
-            ]
-        ),
-        (
-            "Dimensión 3 – Vitalidad e innovación con pertinencia",
-            [
-                "Creatividad con respeto",
-                "Adaptaciones pertinentes",
-                "Renovación generacional o estética sin perder esencia",
-            ]
-        )
-        
-    ])
 
 
 # Instancia global de configuración

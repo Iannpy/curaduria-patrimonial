@@ -62,28 +62,30 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
     with col3:
         st.markdown(f"""
             <div class="metric-card">
-            <div class="dimension-title">Curadores Activos</div>
-            <div class="metric-value">{curadores_activos}</div>
-            </div>""",
-            unsafe_allow_html=True
-        )
-
-    with col4:
-        st.markdown(f"""
-            <div class="metric-card">
             <div class="dimension-title">Promedio General</div>
             <div class="metric-value">{promedio_general:.2f}</div>
             </div>""",
             unsafe_allow_html=True
         )
 
-    with col5:
+    with col4:
         from src.config import config
         en_riesgo = (df_promedios['promedio_final'] < config.umbrales.riesgo_max).sum()
         st.markdown(f"""
             <div class="metric-card">
             <div class="dimension-title">🔴 En Riesgo</div>
             <div class="metric-value">{en_riesgo}</div>
+            </div>""",
+            unsafe_allow_html=True
+        )
+
+    with col5:
+        from src.config import config
+        por_mejorar = (df_promedios['promedio_final'] < config.umbrales.mejora_max).sum() - en_riesgo
+        st.markdown(f"""
+            <div class="metric-card">
+            <div class="dimension-title">🟡 Por mejorar</div>
+            <div class="metric-value">{por_mejorar}</div>
             </div>""",
             unsafe_allow_html=True
         )

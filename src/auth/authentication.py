@@ -47,7 +47,7 @@ class AuthManager:
         if not username or not password:
             return False, None, "Usuario y contraseña son obligatorios"
         
-        username = username.lower().strip()
+        username = username.strip()
         
         try:
             # Obtener usuario de la base de datos
