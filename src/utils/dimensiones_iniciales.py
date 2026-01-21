@@ -40,10 +40,16 @@ FICHAS_INICIALES = [
         'descripcion': 'Naturaleza Fantasía'
     },
     {
+        'codigo': 'DANZAS_REL',
+        'nombre': 'Ficha Danzas de Relación',
+        'descripcion': 'Danzas de Relación'
+    },
+    {
         'codigo': 'DANZAS_ESP',
         'nombre': 'Ficha Danzas Especiales',
-        'descripcion': 'Danzas de Relación, Danzas Especiales y Expresiones Invitadas'
+        'descripcion': 'Danzas Especiales y Expresiones Invitadas'
     }
+    
 ]
 
 
@@ -311,7 +317,38 @@ DIMENSIONES_INICIALES = [
      "orden": 35,
      "aspectos": [
          "Armonía y estética en el vestuario y la parafernalia."]
-    }
+    },
+    # Grupo 8 - Danzas de Relación
+    {"codigo": "DIM36",
+     "nombre": "Puesta en escena - Danzas de Relación",
+     "orden": 36,
+     "aspectos": [
+         "Puesta en escena."]
+    },
+    {"codigo": "DIM37",
+     "nombre": "Coherencia en el Relato del argumento, claridad y entonación en la recitación de los versos y rimas ",
+     "orden": 37,
+     "aspectos": [
+         "Coherencia."]
+    },
+    {"codigo": "DIM38",
+     "nombre": "Vestuario - Danzas de Relación",
+     "orden": 38,
+     "aspectos": [
+         "Vestuario."]
+    },
+    {"codigo": "DIM39",
+     "nombre": "Coreografía y Marcación del ritmo - Danzas de Relación",
+     "orden": 39,
+     "aspectos": [
+         "Coreografía y Marcación del ritmo."]
+    },
+    {"codigo": "DIM40",
+     "nombre": "Música - Danzas de Relación",
+     "orden": 40,
+     "aspectos": [
+         "Música."]
+    },
 ]
 
 
@@ -333,5 +370,7 @@ FICHA_DIMENSIONES_MAP = {
     'SON_DE_NEGRO': ['DIM21', 'DIM22', 'DIM23', 'DIM24', 'DIM25'],
     'COMPARSA_TRAD': ['DIM26', 'DIM27', 'DIM28', 'DIM29', 'DIM30'],
     'COMPARSA_FANT': ['DIM31', 'DIM32', 'DIM33', 'DIM34', 'DIM35'],
-    'DANZAS_ESP': ['DIM2', 'DIM3']  # Ejemplo: esta ficha no tiene DIM1
+    'DANZAS_REL' : ['DIM36', 'DIM37', 'DIM38', 'DIM39', 'DIM40'],
+    'DANZAS_ESP': ['DIM2', 'DIM3']
+    
 }
