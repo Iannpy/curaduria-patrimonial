@@ -1,6 +1,6 @@
 """
 Vista de la interfaz para Curadores
-ACTUALIZADO: Evaluación dinámica por fichas
+ACTUALIZADO: Validación completa de aspectos antes de guardar
 """
 import streamlit as st
 import pandas as pd
@@ -29,51 +29,38 @@ def cargar_grupos_excel():
         return pd.DataFrame()
 
 
-def bloque_aspecto(dimension_nombre: str, aspecto_nombre: str, key_prefix: str):
+def bloque_aspecto(dimension_nombre: str, aspecto_nombre: str, aspecto_id: int, key_prefix: str):
     """
     Renderiza un bloque de evaluación para un aspecto individual
     
     Args:
         dimension_nombre: Nombre de la dimensión padre
         aspecto_nombre: Nombre del aspecto a evaluar
+        aspecto_id: ID del aspecto (para tracking)
         key_prefix: Prefijo único para las claves de widgets
         
     Returns:
-        Tupla (resultado, observacion)
+        int o None: resultado seleccionado (None si no seleccionó nada)
     """
-
-    col_resultado, col_obs = st.columns([3, 1])
+    col_aspecto, col_resultado = st.columns([3, 1])
     
-    # Columna 1: Resultado
-    with col_resultado:
-        """
-        st.markdown("**Estado:**")
-        resultado = st.selectbox(
-            "Seleccione",
-            [2, 1, 0],
-            key=f"res_{key_prefix}",
-            format_func=lambda x: {
-                2: "🟢 Fortaleza",
-                1: "🟡 Oportunidad",
-                0: "🔴 Riesgo"
-            }[x],
-            label_visibility="collapsed"
-        )
-    """
+    # Columna 1: Nombre del aspecto
+    with col_aspecto:
         st.markdown(f"""
         <div style="background-color: #f0f2f6; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-            <p style="margin: 0; color: #666; font-size: 13px;"><b></b></p>
             <p style="margin: 5px 0 0 0; font-size: 16px; font-weight: bold;">{aspecto_nombre}</p>
         </div>
         """, unsafe_allow_html=True)
-    # Columna 2: Observación
-    with col_obs:
+    
+    # Columna 2: Selector de estado
+    with col_resultado:
         st.markdown("**Estado:**")
         resultado = st.selectbox(
             "Seleccione",
-            [2, 1, 0],
+            [None, 2, 1, 0],  # None como primera opción
             key=f"res_{key_prefix}",
             format_func=lambda x: {
+                None: "Seleccione",
                 2: "🟢 Fortaleza",
                 1: "🟡 Oportunidad",
                 0: "🔴 Riesgo"
@@ -180,7 +167,7 @@ def mostrar_vista_curador():
             st.stop()
         
         # ============================================================
-        # NUEVO: Obtener información completa del grupo incluyendo ficha
+        # Obtener información completa del grupo incluyendo ficha
         # ============================================================
         grupo_db = GrupoModel.obtener_por_codigo(str(grupo['Codigo']))
         
@@ -220,7 +207,7 @@ def mostrar_vista_curador():
         st.info(f"📋 **Ficha asignada:** {ficha_nombre}")
         
         # ============================================================
-        # NUEVO: Verificar si ya evaluó este grupo con esta ficha
+        # Verificar si ya evaluó este grupo con esta ficha
         # ============================================================
         if EvaluacionModel.evaluacion_existe(st.session_state.usuario_id, str(grupo['Codigo']), ficha_id):
             st.error(f"⚠️ Ya evaluó este grupo anteriormente")
@@ -269,7 +256,7 @@ def mostrar_vista_curador():
         st.subheader("📝 Evaluación de la Ficha")
         
         # ============================================================
-        # NUEVO: Obtener aspectos según la ficha del grupo
+        # Obtener aspectos según la ficha del grupo
         # ============================================================
         aspectos_por_dimension = AspectoModel.obtener_por_ficha(ficha_id)
         
@@ -291,11 +278,10 @@ def mostrar_vista_curador():
         total_aspectos = sum(len(d['aspectos']) for d in aspectos_por_dimension.values())
         st.caption(f"📊 Esta ficha requiere evaluar **{total_aspectos} aspectos** distribuidos en **{len(aspectos_por_dimension)} dimensiones**")
 
-        # Variable para la observación global (inicializada fuera del form)
-        observacion_global = ""
-
         with st.form("formulario_evaluacion", clear_on_submit=False):
-            evaluaciones = []  # Lista de tuplas (aspecto_id, resultado, observacion)
+            # Diccionario para almacenar las evaluaciones
+            # Clave: aspecto_id, Valor: (aspecto_nombre, dimension_nombre, resultado)
+            evaluaciones_dict = {}
             
             # Iterar sobre cada dimensión de la ficha
             for dim_id, dim_data in sorted(aspectos_por_dimension.items(), key=lambda x: x[1]['dimension']['orden']):
@@ -319,9 +305,18 @@ def mostrar_vista_curador():
                     resultado = bloque_aspecto(
                         dimension_nombre=dimension['nombre'],
                         aspecto_nombre=aspecto['nombre'],
+                        aspecto_id=aspecto['id'],
                         key_prefix=f"asp_{aspecto['id']}"
                     )
-                    evaluaciones.append((aspecto['id'], resultado, observacion_global))
+                    
+                    # Guardar en diccionario
+                    evaluaciones_dict[aspecto['id']] = {
+                        'aspecto_nombre': aspecto['nombre'],
+                        'dimension_nombre': dimension['nombre'],
+                        'resultado': resultado
+                    }
+            
+            # Campo de observación global
             st.markdown("**Observación Cualitativa:**")
             observacion_global = st.text_area(
                 "",
@@ -331,11 +326,10 @@ def mostrar_vista_curador():
                 help="Esta observación aplicará a todos los aspectos evaluados en esta ficha"
             )
 
-
             st.markdown("---")
             
             # Información de resumen antes de guardar
-            st.info(f"📝 Está a punto de registrar **{len(evaluaciones)} evaluaciones** para el grupo **{grupo['Nombre_Propuesta']}**")
+            st.info(f"📝 Está a punto de registrar **{len(evaluaciones_dict)} evaluaciones** para el grupo **{grupo['Nombre_Propuesta']}**")
             
             # Botones
             col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
@@ -348,43 +342,86 @@ def mostrar_vista_curador():
                 )
             
             if submitted:
-                # Validar la observación global
+                # ============================================================
+                # VALIDACIÓN COMPLETA
+                # ============================================================
                 errores = []
-
+                aspectos_sin_calificar = []
+                
+                # 1. Validar que TODOS los aspectos tengan calificación
+                for aspecto_id, datos in evaluaciones_dict.items():
+                    if datos['resultado'] is None:
+                        aspectos_sin_calificar.append({
+                            'dimension': datos['dimension_nombre'],
+                            'aspecto': datos['aspecto_nombre']
+                        })
+                
+                if aspectos_sin_calificar:
+                    errores.append(f"**{len(aspectos_sin_calificar)} aspectos sin calificar:**")
+                    
+                    # Agrupar por dimensión para mostrar de forma organizada
+                    por_dimension = {}
+                    for item in aspectos_sin_calificar:
+                        dim = item['dimension']
+                        if dim not in por_dimension:
+                            por_dimension[dim] = []
+                        por_dimension[dim].append(item['aspecto'])
+                    
+                    for dim, aspectos in por_dimension.items():
+                        errores.append(f"\n**{dim}:**")
+                        for asp in aspectos:
+                            errores.append(f"  • {asp}")
+                
+                # 2. Validar la observación global
                 valido, error = validar_observacion(observacion_global)
                 if not valido:
-                    errores.append(f"**Observación Cualitativa:** {error}")
-
+                    errores.append(f"\n**Observación Cualitativa:** {error}")
+                
+                # Si hay errores, mostrarlos
                 if errores:
-                    st.error("❌ Complete correctamente todas las observaciones:")
+                    st.error("❌ Complete correctamente todos los campos antes de guardar:")
                     for error in errores:
-                        st.markdown(f"• {error}")
+                        st.markdown(error)
+                    
+                    # Consejo adicional
+                    st.warning("⚠️ Revise el formulario y asegúrese de:")
+                    st.markdown("""
+                    - ✓ Calificar **TODOS** los aspectos (ninguno debe quedar en "-- Seleccione --")
+                    - ✓ Escribir una observación cualitativa válida (mínimo 5 caracteres)
+                    """)
                 else:
-                    # Guardar evaluaciones
+                    # ============================================================
+                    # GUARDAR EVALUACIONES
+                    # ============================================================
                     try:
                         exito = True
                         evaluaciones_guardadas = 0
+                        
+                        # Preparar lista de evaluaciones válidas
+                        evaluaciones_validas = [
+                            (aspecto_id, datos['resultado'], observacion_global)
+                            for aspecto_id, datos in evaluaciones_dict.items()
+                            if datos['resultado'] is not None
+                        ]
                         
                         # Mostrar progreso
                         progress_bar = st.progress(0)
                         status_text = st.empty()
                         
-                        for idx, (aspecto_id, resultado, _) in enumerate(evaluaciones):
+                        for idx, (aspecto_id, resultado, observacion) in enumerate(evaluaciones_validas):
                             # Actualizar progreso
-                            progress = (idx + 1) / len(evaluaciones)
+                            progress = (idx + 1) / len(evaluaciones_validas)
                             progress_bar.progress(progress)
-                            status_text.text(f"Guardando evaluación {idx + 1} de {len(evaluaciones)}...")
+                            status_text.text(f"Guardando evaluación {idx + 1} de {len(evaluaciones_validas)}...")
                             
-                            # ============================================================
-                            # NUEVO: Incluir ficha_id al crear evaluación
-                            # ============================================================
+                            # Crear evaluación
                             eval_id = EvaluacionModel.crear_evaluacion(
                                 usuario_id=st.session_state.usuario_id,
                                 codigo_grupo=str(grupo['Codigo']),
-                                ficha_id=ficha_id,  # ← NUEVO PARÁMETRO
+                                ficha_id=ficha_id,
                                 aspecto_id=aspecto_id,
                                 resultado=resultado,
-                                observacion=observacion_global
+                                observacion=observacion
                             )
                             
                             if eval_id:
@@ -398,7 +435,7 @@ def mostrar_vista_curador():
                         progress_bar.empty()
                         status_text.empty()
                         
-                        if exito:
+                        if exito and evaluaciones_guardadas == len(evaluaciones_validas):
                             # Registrar log
                             LogModel.registrar_log(
                                 usuario=st.session_state.usuario,
@@ -411,7 +448,7 @@ def mostrar_vista_curador():
                             st.balloons()
                             st.session_state.evaluacion_guardada = True
                         else:
-                            st.error(f"❌ Error al guardar la evaluación. Se guardaron {evaluaciones_guardadas} de {len(evaluaciones)} aspectos.")
+                            st.error(f"❌ Error al guardar la evaluación. Se guardaron {evaluaciones_guardadas} de {len(evaluaciones_validas)} aspectos.")
                             st.warning("⚠️ Contacte al administrador con este mensaje de error")
                             
                     except Exception as e:
@@ -432,7 +469,7 @@ def mostrar_vista_curador():
         
         # Información adicional
         with st.expander("ℹ️ Guía de Evaluación"):
-            st.markdown("""
+            st.markdown(f"""
             ### 🎯 Criterios de Calificación
             
             **🟢 Fortaleza Patrimonial (2 puntos)**
@@ -455,31 +492,31 @@ def mostrar_vista_curador():
             
             ---
             
-             ### 📝 Guía para Observaciones
+            ### 📝 Guía para Observaciones
 
-             La observación cualitativa debe ser:
+            La observación cualitativa debe ser:
 
-             - **General:** Aplica a toda la ficha de evaluación, no a aspectos individuales
-             - **Específica:** Mencione qué observó concretamente en la presentación
-             - **Descriptiva:** Describa la situación sin juicios de valor excesivos
-             - **Constructiva:** Oriente sobre qué mantener o mejorar en general
-             - **Fundamentada:** Base sus observaciones en evidencia concreta de la presentación
+            - **General:** Aplica a toda la ficha de evaluación, no a aspectos individuales
+            - **Específica:** Mencione qué observó concretamente en la presentación
+            - **Descriptiva:** Describa la situación sin juicios de valor excesivos
+            - **Constructiva:** Oriente sobre qué mantener o mejorar en general
+            - **Fundamentada:** Base sus observaciones en evidencia concreta de la presentación
 
-             **Requisitos técnicos:**
-             - Mínimo: 5 caracteres por observación
-             - Recomendado: 50-200 caracteres para una evaluación completa
-             - Evite observaciones genéricas como "bien", "mal", "regular"
-             - Esta observación se aplicará a todos los aspectos evaluados
+            **Requisitos técnicos:**
+            - Mínimo: 5 caracteres por observación
+            - Recomendado: 50-200 caracteres para una evaluación completa
+            - Evite observaciones genéricas como "bien", "mal", "regular"
+            - Esta observación se aplicará a todos los aspectos evaluados
 
-             ---
+            ---
 
-             ### 💡 Consejos Prácticos
+            ### 💡 Consejos Prácticos
 
-             1. **Tome notas durante la presentación** general del grupo
-             2. **Sea objetivo** y base sus evaluaciones en criterios patrimoniales
-             3. **Sea coherente** en sus calificaciones entre diferentes grupos
-             4. **Documente lo positivo y lo mejorable** en la observación general
-             5. **Revise antes de guardar** que la observación esté completa
+            1. **Tome notas durante la presentación** general del grupo
+            2. **Sea objetivo** y base sus evaluaciones en criterios patrimoniales
+            3. **Sea coherente** en sus calificaciones entre diferentes grupos
+            4. **Documente lo positivo y lo mejorable** en la observación general
+            5. **Revise antes de guardar** que todos los aspectos estén calificados
             
             ---
             
@@ -492,8 +529,4 @@ def mostrar_vista_curador():
             **Ficha actual:** {ficha_nombre}  
             **Aspectos a evaluar:** {total_aspectos}  
             
-            """.format(
-                ficha_nombre=ficha_nombre,
-                total_aspectos=total_aspectos,
-                len=len
-            ))
+            """)
