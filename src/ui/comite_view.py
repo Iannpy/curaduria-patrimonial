@@ -817,36 +817,35 @@ def mostrar_analisis_curadores(df_eval: pd.DataFrame):
     st.markdown("---")
     
     # Gráficos
-    col_g1, col_g2 = st.columns(2)
     
-    with col_g1:
-        st.subheader("Grupos Evaluados por Curador")
-        chart1 = alt.Chart(df_cur).mark_bar().encode(
-            x=alt.X('curador:N', title='Curador'),
-            y=alt.Y('grupos_evaluados:Q', title='Grupos Evaluados'),
-            color=alt.value('#1a9641'),
-            tooltip=['curador', 'grupos_evaluados', alt.Tooltip('promedio_otorgado:Q', format='.2f')]
-        ).properties(height=300)
-        
-        st.altair_chart(chart1, use_container_width=True)
     
-    with col_g2:
-        st.subheader("Promedio Otorgado por Curador")
-        chart2 = alt.Chart(df_cur).mark_bar().encode(
-            x=alt.X('curador:N', title='Curador'),
-            y=alt.Y('promedio_otorgado:Q', title='Promedio', scale=alt.Scale(domain=[0, 2])),
-            color=alt.Color(
-                'promedio_otorgado:Q',
-                scale=alt.Scale(
-                    domain=[0, 0.67, 1.33, 2],
-                    range=['#d73027', '#fee08b', '#d9ef8b', '#1a9850']
-                ),
-                legend=None
+    st.subheader("Grupos Evaluados por Curador")
+    chart1 = alt.Chart(df_cur).mark_bar().encode(
+        x=alt.X('curador:N', title='Curador'),
+        y=alt.Y('grupos_evaluados:Q', title='Grupos Evaluados'),
+        color=alt.value('#1a9641'),
+        tooltip=['curador', 'grupos_evaluados', alt.Tooltip('promedio_otorgado:Q', format='.2f')]
+    ).properties(height=300)
+    
+    st.altair_chart(chart1, use_container_width=True)
+    
+    
+    st.subheader("Promedio Otorgado por Curador")
+    chart2 = alt.Chart(df_cur).mark_bar().encode(
+        x=alt.X('curador:N', title='Curador'),
+        y=alt.Y('promedio_otorgado:Q', title='Promedio', scale=alt.Scale(domain=[0, 2])),
+        color=alt.Color(
+            'promedio_otorgado:Q',
+            scale=alt.Scale(
+                domain=[0, 0.67, 1.33, 2],
+                range=['#d73027', '#fee08b', '#d9ef8b', '#1a9850']
             ),
-            tooltip=['curador', alt.Tooltip('promedio_otorgado:Q', format='.2f')]
-        ).properties(height=300)
-        
-        st.altair_chart(chart2, use_container_width=True)
+            legend=None
+        ),
+        tooltip=['curador', alt.Tooltip('promedio_otorgado:Q', format='.2f')]
+    ).properties(height=300)
+    
+    st.altair_chart(chart2, use_container_width=True)
     
     # Tabla detallada
     st.subheader("📊 Detalle por Curador")
