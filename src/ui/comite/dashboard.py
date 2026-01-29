@@ -9,12 +9,49 @@ import numpy as np
 from .utils import estado_patrimonial
 from src.config import config
 
+def hex_to_rgb(hex_color):
+    hex_color = hex_color.lstrip('#')
+    return np.array([int(hex_color[i:i+2], 16) for i in (0, 2, 4)])
+
+def rgb_to_hex(rgb):
+    return '#{:02x}{:02x}{:02x}'.format(*rgb.astype(int))
+
+def color_gradiente(valor, min_val=0, max_val=2):
+    """
+    Gradiente continuo tipo Altair
+    """
+    # Colores ancla (puedes cambiarlos)
+    colores = [
+        '#DA0024',  # rojo
+        '#FFCA00',  # amarillo
+        '#1a9850'   # verde fuerte
+    ]
+
+    # Normalizar valor
+    t = np.clip((valor - min_val) / (max_val - min_val), 0, 1)
+
+    # Posición en la escala
+    idx = t * (len(colores) - 1)
+    i = int(np.floor(idx))
+    frac = idx - i
+
+    if i >= len(colores) - 1:
+        return colores[-1]
+
+    c1 = hex_to_rgb(colores[i])
+    c2 = hex_to_rgb(colores[i + 1])
+
+    rgb = c1 + frac * (c2 - c1)
+    return rgb_to_hex(rgb)
+
+
 
 def mostrar_dashboard(df_eval: pd.DataFrame):
     """Dashboard general con KPIs y gráficos principales mejorados"""
+
     
     st.header("📊 Dashboard General")
-    st.markdown("**Resumen Ejecutivo de Evaluaciones Patrimoniales**")
+   
     
     if df_eval.empty:
         st.warning("⚠️ No hay evaluaciones registradas todavía")
@@ -50,6 +87,11 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
     grupos_evaluados = df_promedios['codigo_grupo'].nunique()
     promedio_general = df_promedios['promedio_final'].mean()
     desviacion_std = df_promedios['promedio_final'].std()
+
+    color_estado_general = color_gradiente(promedio_general)
+
+    
+
     
     # Calcular estados
     en_riesgo = (df_promedios['promedio_final'] < config.umbrales.riesgo_max).sum()
@@ -68,18 +110,22 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
     
     with col2:
         st.metric(
-            "Total Evaluaciones",
+            "Total Observaciones",
             total_evaluaciones,
-            help="Total de evaluaciones registradas"
+            help="Total de observaciones registradas"
         )
     
     with col3:
-        st.metric(
-            "Promedio General",
-            f"{promedio_general:.2f}",
-            delta=f"σ={desviacion_std:.2f}" if not pd.isna(desviacion_std) else None,
-            help="Promedio general de todas las evaluaciones"
-        )
+        st.markdown(f"""<p style="font-size: 15px; font-type:normal; margin-bottom: 0px;">
+                    Estado Patrimonial General</p>
+            <div style="
+                width: 40px;
+                margin-top: 5px;
+                height: 40px;
+                background-color: {color_estado_general};
+                border-radius: 5px;
+            "></div>""", unsafe_allow_html=True)
+        
     
     with col4:
         st.metric(
@@ -105,11 +151,14 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
             delta=f"{(fortalecidos/grupos_evaluados*100):.1f}%" if grupos_evaluados > 0 else None,
             help="Grupos con promedio ≥ 1.6"
         )
-    
+
+
+
     # Estado patrimonial general
-    estado_general = estado_patrimonial(promedio_general)
-    st.info(f"**Estado Patrimonial General:** {estado_general} | Promedio: {promedio_general:.2f} | Desviación Estándar: {desviacion_std:.2f}")
     
+    
+
+    """
     # ============================================================
     # ANÁLISIS ESTADÍSTICO PROFUNDO
     # ============================================================
@@ -143,41 +192,15 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
     
     st.altair_chart(chart_box, use_container_width=True)
     
-    # ============================================================
-    # INSIGHTS Y RECOMENDACIONES MEJORADOS
-    # ============================================================
-    st.markdown("---")
-    st.subheader("💡 Insights y Recomendaciones")
     
-    col_ins1, col_ins2 = st.columns(2)
-    
-    with col_ins1:
-        if en_riesgo > 0:
-            porcentaje_riesgo = (en_riesgo / grupos_evaluados) * 100 if grupos_evaluados > 0 else 0
-            st.warning(f"⚠️ **{en_riesgo} grupos en riesgo** ({porcentaje_riesgo:.1f}%) requieren atención inmediata")
-            st.markdown("**Recomendaciones:**")
-            st.markdown("- Revisar evaluaciones detalladas por grupo")
-            st.markdown("- Identificar dimensiones críticas")
-            st.markdown("- Planificar intervenciones específicas")
-            st.markdown("- Establecer mentorías con grupos fortalecidos")
-    
-    with col_ins2:
-        if fortalecidos > 0:
-            porcentaje_fort = (fortalecidos / grupos_evaluados) * 100 if grupos_evaluados > 0 else 0
-            st.success(f"✅ **{fortalecidos} grupos fortalecidos** ({porcentaje_fort:.1f}%) son modelos a seguir")
-            st.markdown("**Acciones:**")
-            st.markdown("- Documentar buenas prácticas")
-            st.markdown("- Compartir conocimientos entre grupos")
-            st.markdown("- Reconocer logros públicamente")
-            st.markdown("- Considerar para Congos de Oro")
     
     if curadores_activos > 0:
         evaluaciones_por_curador = total_evaluaciones / curadores_activos
         aspectos_por_grupo = total_evaluaciones / grupos_evaluados if grupos_evaluados > 0 else 0
-        st.info(f"📊 **Productividad:** {evaluaciones_por_curador:.1f} evaluaciones/curador | {aspectos_por_grupo:.1f} aspectos/grupo")
-    
+        st.info(f"📊 **Productividad:** {evaluaciones_por_curador:.1f} observaciones/curador | {aspectos_por_grupo:.1f} aspectos/grupo")
+    """
     # ============================================================
-    # ANÁLISIS POR FICHA (CORREGIDO - antes era modalidad)
+    # ANÁLISIS POR FICHA 
     # ============================================================
     st.markdown("---")
     st.subheader("📊 Análisis por Ficha de Evaluación")
@@ -188,44 +211,69 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
             .agg(
                 promedio=('promedio_final', 'mean'),
                 cantidad=('codigo_grupo', 'count'),
-                desviacion=('promedio_final', 'std'),
-                min_promedio=('promedio_final', 'min'),
-                max_promedio=('promedio_final', 'max')
+                #desviacion=('promedio_final', 'std'),
+                #min_promedio=('promedio_final', 'min'),
+                #max_promedio=('promedio_final', 'max')
             )
             .sort_values('promedio', ascending=False)
         )
         
         # Gráfico mejorado
         chart_ficha = alt.Chart(df_ficha).mark_bar().encode(
-            x=alt.X('promedio:Q', title='Promedio', scale=alt.Scale(domain=[0, 2])),
+            x=alt.X('promedio:Q', title='Estado', scale=alt.Scale(domain=[0, 2]), axis=alt.Axis(labels=False)),
             y=alt.Y('ficha:N', title='Ficha', sort='-x'),
             color=alt.Color(
                 'promedio:Q',
                 scale=alt.Scale(
-                    domain=[0, config.umbrales.riesgo_max, config.umbrales.mejora_max, 2],
-                    range=['#d73027', '#fee08b', '#b3ef8b', '#1a9850']
+                    domain=[0, config.umbrales.riesgo_max,1, config.umbrales.mejora_max, 2],
+                    range=['#DA0024', "#feb98b", '#FFCA00', '#b3ef8b', '#00AD1B']
                 ),
                 legend=None
             ),
             tooltip=[
                 'ficha',
-                alt.Tooltip('promedio:Q', format='.2f', title='Promedio'),
+                # alt.Tooltip('promedio:Q', format='.2f', title='Promedio'),
                 alt.Tooltip('cantidad:Q', title='Grupos'),
-                alt.Tooltip('desviacion:Q', format='.2f', title='Desv. Est.'),
-                alt.Tooltip('min_promedio:Q', format='.2f', title='Mínimo'),
-                alt.Tooltip('max_promedio:Q', format='.2f', title='Máximo')
+                # alt.Tooltip('desviacion:Q', format='.2f', title='Desv. Est.'),
+                # alt.Tooltip('min_promedio:Q', format='.2f', title='Mínimo'),
+                # alt.Tooltip('max_promedio:Q', format='.2f', title='Máximo')
             ]
         ).properties(height=max(300, len(df_ficha) * 40))
         
         st.altair_chart(chart_ficha, use_container_width=True)
-        
+        """"""
+        def estilo_estado_ficha(row):
+            color = color_gradiente(row['promedio'])
+            return [
+                f'background-color: {color}'
+                if col == 'resultado_emoji' else ''
+                for col in row.index
+            ]
+        df_ficha['resultado_emoji'] = df_ficha['promedio'].apply(lambda x:"")
+            
+        st.dataframe(
+            df_ficha
+                .style
+                .apply(estilo_estado_ficha, axis=1)
+                .format({'promedio': '{:.2f}'}),
+            use_container_width=False,
+            hide_index=True,
+            column_config={
+                'promedio': None,
+                'ficha': 'Ficha',
+                'resultado_emoji': st.column_config.TextColumn('Estado'),
+                'cantidad': st.column_config.NumberColumn('Grupos', format='%d'),
+                
+            }
+        )
+        """
         # Tabla detallada con más métricas
         st.dataframe(
             df_ficha.style.format({
                 'promedio': '{:.2f}',
-                'desviacion': '{:.2f}',
-                'min_promedio': '{:.2f}',
-                'max_promedio': '{:.2f}'
+                #'desviacion': '{:.2f}',
+                #'min_promedio': '{:.2f}',
+                #'max_promedio': '{:.2f}'
             }),
             use_container_width=True,
             hide_index=True,
@@ -233,11 +281,12 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
                 'ficha': 'Ficha',
                 'promedio': st.column_config.NumberColumn('Promedio', format='%.2f'),
                 'cantidad': st.column_config.NumberColumn('Grupos', format='%d'),
-                'desviacion': st.column_config.NumberColumn('Desv. Est.', format='%.2f'),
-                'min_promedio': st.column_config.NumberColumn('Mínimo', format='%.2f'),
-                'max_promedio': st.column_config.NumberColumn('Máximo', format='%.2f')
+               # 'desviacion': st.column_config.NumberColumn('Desv. Est.', format='%.2f'),
+               # 'min_promedio': st.column_config.NumberColumn('Mínimo', format='%.2f'),
+               # 'max_promedio': st.column_config.NumberColumn('Máximo', format='%.2f')
             }
         )
+        """
     else:
         st.warning("⚠️ No hay información de fichas disponible en los datos")
     
@@ -288,7 +337,7 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
                 'porcentaje': st.column_config.NumberColumn('%', format='%.1f')
             }
         )
-    
+
     # ============================================================
     # ENTREGA DE CONGOS DE ORO (CORREGIDO - POR FICHA)
     # ============================================================
@@ -337,7 +386,18 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
         
         with col_info3:
             promedio_ficha = df_filtrado['promedio_final'].mean()
-            st.metric("Promedio de Ficha", f"{promedio_ficha:.2f}")
+            color_estdo_ficha = color_gradiente(promedio_ficha)
+            #st.metric("Promedio de Ficha", f"{promedio_ficha:.2f}")
+            st.markdown(f"""<p style="font-size: 15px; font-type:normal; margin-bottom: 0px;">
+                                Estado Patrimonial General</p>
+                        <div style="
+                            width: 40px;
+                            margin-top: 5px;
+                            height: 40px;
+                            background-color: {color_estdo_ficha};
+                            border-radius: 5px;
+                        "></div>""", unsafe_allow_html=True)
+            
         
         if cantidad_congos <= 0:
             st.info("No hay congos asignables para esta ficha (cantidad insuficiente).")
@@ -350,7 +410,7 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
             # Agregar ranking
             top_ficha.insert(0, 'Ranking', range(1, len(top_ficha) + 1))
             
-            st.success(f"🏆 **{len(top_ficha)} grupos candidatos a Congos de Oro para la ficha '{seleccion_ficha}'**")
+            st.success(f"🏆 ***{len(top_ficha)} grupos candidatos a Congos de Oro para la ficha*** **{seleccion_ficha}**")
             
             # Gráfico de barras de los candidatos
             chart_congos = alt.Chart(top_ficha).mark_bar().encode(
@@ -383,7 +443,8 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
                     'Ranking': st.column_config.NumberColumn('Ranking', format='%d'),
                     'nombre_propuesta': 'Grupo',
                     'codigo_grupo': 'Código',
-                    'promedio_final': st.column_config.NumberColumn('Promedio', format='%.2f'),
+                    'promedio_final': None,
+                    #'promedio_final': st.column_config.NumberColumn('Promedio', format='%.2f'),
                     'estado': 'Estado'
                 }
             )
@@ -392,7 +453,7 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
             if len(top_ficha) > 0:
                 promedio_minimo = top_ficha['promedio_final'].min()
                 promedio_maximo = top_ficha['promedio_final'].max()
-                st.caption(f"📊 Rango de promedios: {promedio_minimo:.2f} - {promedio_maximo:.2f}")
+                #st.caption(f"📊 Rango de promedios: {promedio_minimo:.2f} - {promedio_maximo:.2f}")
     
     # ============================================================
     # GRUPOS QUE REQUIEREN ATENCIÓN
@@ -409,7 +470,14 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
         st.dataframe(
             grupos_riesgo.style.format({'promedio_final': '{:.2f}'}),
             use_container_width=True,
-            hide_index=True
+            hide_index=True,
+            column_config={
+                'ficha': 'Ficha',
+                'nombre_propuesta': 'Grupo',
+                'codigo_grupo': 'Código',
+                'promedio_final': None,
+                'estado': 'Estado'
+            }
         )
     else:
         st.success("✅ No hay grupos en riesgo crítico")
@@ -432,7 +500,15 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
                 top_por_ficha[['ficha', 'nombre_propuesta', 'codigo_grupo', 'promedio_final', 'estado']]
                     .style.format({'promedio_final': '{:.2f}'}),
                 use_container_width=True,
-                hide_index=True
+                hide_index=True,
+                column_config={
+                'ficha': 'Ficha',
+                'nombre_propuesta': 'Grupo',
+                'codigo_grupo': 'Código',
+                'promedio_final': None,
+                'estado': 'Estado'
+                
+                }
             )
         else:
             st.info("No hay datos suficientes para mostrar top grupos")

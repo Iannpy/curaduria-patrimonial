@@ -13,9 +13,11 @@ from src.auth.authentication import crear_boton_logout
 from streamlit_option_menu import option_menu
 from .comite.utils import estado_patrimonial, estado_patrimonial_texto
 from .comite.exports import generar_pdf_grupo, crear_backup_zip
-from .comite.dashboard import mostrar_dashboard
+from .comite.dashboard import mostrar_dashboard, color_gradiente
 
 logger = logging.getLogger(__name__)
+
+import numpy as np
 
 
 
@@ -41,14 +43,20 @@ def mostrar_informe_grupo(df_eval: pd.DataFrame, codigo_grupo: str):
 
     # Métricas principales del grupo
     col1, col2, col3, col4 = st.columns(4)
-
+   
     promedio_grupo = df_grupo['resultado'].mean()
+    color = color_gradiente(promedio_grupo)
     evaluaciones_total = len(df_grupo)
     curadores_unicos = df_grupo['curador'].nunique()
     aspectos_evaluados = df_grupo['aspecto'].nunique()
 
     with col1:
-        st.metric("Promedio General", f"{promedio_grupo:.2f}")
+        st.markdown(f"""**Estado Patrimonial**:<div style="
+                width: 40px;
+                height: 40px;
+                background-color: {color};
+                border-radius: 6px
+            "></div>""", unsafe_allow_html=True)
     with col2:
         st.metric("Total Evaluaciones", evaluaciones_total)
     with col3:
@@ -56,14 +64,13 @@ def mostrar_informe_grupo(df_eval: pd.DataFrame, codigo_grupo: str):
     with col4:
         st.metric("Aspectos Evaluados", aspectos_evaluados)
 
-    # Estado patrimonial
-    estado = estado_patrimonial(promedio_grupo)
-    st.info(f"**Estado Patrimonial:** {estado}")
+
 
     st.markdown("---")
 
     # Desempeño por dimensión
     st.subheader("📊 Desempeño por Dimensión")
+
 
     df_dim_grupo = (df_grupo
         .groupby('dimension', as_index=False)
@@ -74,15 +81,35 @@ def mostrar_informe_grupo(df_eval: pd.DataFrame, codigo_grupo: str):
         )
         .sort_values('promedio', ascending=False)
     )
+    color_gradiente
 
+    def estilo_estado_dimension(row):
+        color = color_gradiente(row['promedio'])
+        return [
+            f'background-color: {color}'
+            if col == 'resultado_emoji' else ''
+            for col in row.index
+        ]
+    df_dim_grupo['resultado_emoji'] = df_dim_grupo['promedio'].apply(lambda x: '')
     st.dataframe(
-        df_dim_grupo.style.format({'promedio': '{:.2f}'}),
-        use_container_width=True,
-        hide_index=True
+        df_dim_grupo
+            .style
+            .apply(estilo_estado_dimension, axis=1)
+            .format({'promedio': '{:.2f}'}),
+        use_container_width=False,
+        hide_index=True,
+        column_config={
+            'promedio': None,
+            'evaluaciones': None,
+            'curadores': None,
+            'resultado_emoji': st.column_config.TextColumn('Estado'),
+        }
     )
+    
 
     # Desempeño por aspecto
     st.subheader("✅ Detalle por Aspecto")
+
 
     df_aspecto_grupo = (df_grupo
         .groupby(['dimension', 'aspecto'], as_index=False)
@@ -92,40 +119,56 @@ def mostrar_informe_grupo(df_eval: pd.DataFrame, codigo_grupo: str):
         )
         .sort_values(['dimension', 'promedio'], ascending=[True, False])
     )
+    def estilo_estado_aspecto(row):
+        color = color_gradiente(row['promedio'])
+        return [
+            f'background-color: {color}; text-align: center; font-weight: bold'
+            if col == 'resultado_emoji' else ''
+            for col in row.index
+        ]
 
     # Mapear resultados a emojis
-    df_aspecto_grupo['resultado_emoji'] = df_aspecto_grupo['promedio'].apply(lambda x: '🟢' if x >= 1.5 else '🟡' if x >= 0.5 else '🔴')
+    df_aspecto_grupo['resultado_emoji'] = df_aspecto_grupo['promedio'].apply(lambda x: '')
 
     st.dataframe(
-        df_aspecto_grupo[['dimension', 'aspecto', 'resultado_emoji', 'promedio', 'evaluaciones']].style.format({'promedio': '{:.2f}'}),
+        df_aspecto_grupo[['dimension', 'aspecto', 'resultado_emoji', 'evaluaciones', 'promedio']]
+            .style
+            .apply(estilo_estado_aspecto, axis=1)
+            .format({'promedio': '{:.2f}'}),
         use_container_width=True,
         hide_index=True,
         column_config={
+            'promedio': None,
+            'evaluaciones': None,
             'resultado_emoji': st.column_config.TextColumn('Estado'),
-            'promedio': st.column_config.NumberColumn('Promedio', format='%.2f')
         }
     )
-
+    
+    """
     # Evaluaciones detalladas
     st.subheader("📋 Evaluaciones Detalladas")
 
     df_detalle = df_grupo[[
-        'curador', 'dimension', 'aspecto', 'resultado', 'observacion', 'fecha_registro'
+        'curador',
+        'dimension',
+        'aspecto',
+        'observacion',
+        'fecha_registro'
     ]].copy()
 
-    # Mapear resultado a emoji
-    df_detalle['resultado_emoji'] = df_detalle['resultado'].map({2: '🟢', 1: '🟡', 0: '🔴'})
+    # Emoji basado en resultado (se calcula antes)
+    df_detalle['resultado_emoji'] = df_grupo['resultado'].map({2: '🟢', 1: '🟡', 0: '🔴'})
 
     st.dataframe(
         df_detalle.sort_values('fecha_registro', ascending=False),
         use_container_width=True,
         hide_index=True,
         column_config={
-            'resultado_emoji': st.column_config.TextColumn('Resultado'),
+            'resultado_emoji': st.column_config.TextColumn('Estado'),
             'fecha_registro': st.column_config.DatetimeColumn('Fecha', format='DD/MM/YYYY HH:mm')
         }
     )
-
+    """
     
     # Observaciones cualitativas
     st.subheader("💬 Observaciones Cualitativas")
@@ -138,7 +181,7 @@ def mostrar_informe_grupo(df_eval: pd.DataFrame, codigo_grupo: str):
     
     if not observaciones_unicas.empty:
         for _, row in observaciones_unicas.iterrows():
-            st.markdown(f"**{row['curador']}**: {row['observacion']}")
+            st.markdown(f"* {row['observacion']}")
     else:
         st.info("No hay observaciones cualitativas registradas para este grupo")
 
@@ -1003,7 +1046,7 @@ def mostrar_analisis_por_ficha(df_eval: pd.DataFrame):
     st.caption("Desempeño consolidado por tipo de ficha de evaluación")
     
     # Verificar que haya columna ficha
-    if 'ficha' not in df_eval.columns:
+    if 'ficha' not in df_eval.columns:  
         st.warning("⚠️ No hay información de fichas en las evaluaciones")
         return
     
@@ -1028,7 +1071,7 @@ def mostrar_analisis_por_ficha(df_eval: pd.DataFrame):
             st.metric(
                 "Ficha con Mejor Desempeño",
                 ficha_mejor.iloc[0]['ficha'],
-                f"{ficha_mejor.iloc[0]['promedio_general']:.2f}"
+                #f"{ficha_mejor.iloc[0]['promedio_general']:.2f}"
             )
     
     with col3:
@@ -1042,18 +1085,18 @@ def mostrar_analisis_por_ficha(df_eval: pd.DataFrame):
     
     chart = alt.Chart(df_stats_ficha).mark_bar().encode(
         y=alt.Y('ficha:N', title='Ficha', sort='-x'),
-        x=alt.X('promedio_general:Q', title='Promedio General', scale=alt.Scale(domain=[0, 2])),
+        x=alt.X('promedio_general:Q', title='Estado General', scale=alt.Scale(domain=[0, 2]), axis=alt.Axis(labels=False)),
         color=alt.Color(
             'promedio_general:Q',
             scale=alt.Scale(
-                domain=[0, 0.67, 1.33, 2],
-                range=['#d73027', '#fee08b', '#d9ef8b', '#1a9850']
-            ),
+                    domain=[0, config.umbrales.riesgo_max,1, config.umbrales.mejora_max, 2],
+                    range=['#DA0024', "#feb98b", '#FFCA00', '#b3ef8b', '#00AD1B']
+                ),
             legend=None
         ),
         tooltip=[
             'ficha',
-            alt.Tooltip('promedio_general:Q', format='.2f', title='Promedio'),
+            #alt.Tooltip('promedio_general:Q', format='.2f', title='Promedio'),
             alt.Tooltip('grupos_evaluados:Q', title='Grupos'),
             alt.Tooltip('total_evaluaciones:Q', title='Evaluaciones')
         ]
@@ -1066,18 +1109,30 @@ def mostrar_analisis_por_ficha(df_eval: pd.DataFrame):
     
     # Formatear columnas
     df_display = df_stats_ficha.copy()
-    df_display['promedio_general'] = df_display['promedio_general'].apply(lambda x: f"{x:.2f}")
+
+    def estilo_estado_ficha(row):
+                color = color_gradiente(row['promedio_general'])
+                return [
+                    f'background-color: {color}'
+                    if col == 'resultado_emoji' else ''
+                    for col in row.index
+                ]
+    df_display['resultado_emoji'] = df_display['promedio_general'].apply(lambda x:"")
+    
     
     st.dataframe(
-        df_display,
+        df_display.style.apply(estilo_estado_ficha, axis=1),
         use_container_width=True,
         hide_index=True,
         column_config={
+            'ficha_id': None,
             'ficha': 'Ficha',
             'grupos_evaluados': st.column_config.NumberColumn('Grupos', format='%d'),
-            'curadores': st.column_config.NumberColumn('Curadores', format='%d'),
+            'curadores': None,
+            #'curadores': st.column_config.NumberColumn('Curadores', format='%d'),
             'total_evaluaciones': st.column_config.NumberColumn('Evaluaciones', format='%d'),
-            'promedio_general': 'Promedio',
+            'promedio_general': None,
+            'resultado_emoji': 'Estado',
             'fortalezas': st.column_config.NumberColumn('🟢 Fortalezas', format='%d'),
             'oportunidades': st.column_config.NumberColumn('🟡 Oportunidades', format='%d'),
             'riesgos': st.column_config.NumberColumn('🔴 Riesgos', format='%d')
@@ -1087,7 +1142,7 @@ def mostrar_analisis_por_ficha(df_eval: pd.DataFrame):
     st.markdown("---")
     
     # Análisis detallado por ficha seleccionada
-    st.subheader("🔍 Análisis Detallado por Ficha")
+    st.subheader("📇 Análisis Detallado por Ficha")
     
     fichas_disponibles = df_stats_ficha['ficha'].tolist()
     ficha_seleccionada = st.selectbox("Seleccionar ficha:", fichas_disponibles)
@@ -1098,96 +1153,173 @@ def mostrar_analisis_por_ficha(df_eval: pd.DataFrame):
         
         if df_ficha.empty:
             st.warning(f"No hay evaluaciones para la ficha '{ficha_seleccionada}'")
-        else:
-            col_info1, col_info2, col_info3 = st.columns(3)
+        
+
+        total_evaluaciones = len(df_eval)
+        curadores_activos = df_eval['curador'].nunique()
+        grupos_evaluados = df_ficha['codigo_grupo'].nunique()
+        promedio_general = df_ficha['resultado'].mean()
+        desviacion_std = df_ficha['resultado'].std()
+
+        color_estado_general = color_gradiente(promedio_general)
+
+        
+
+        
+        # Calcular estados
+        en_riesgo = (df_ficha['resultado'] < config.umbrales.riesgo_max).sum()
+        por_mejorar = ((df_ficha['resultado'] >= config.umbrales.riesgo_max) & 
+                    (df_ficha['resultado'] < config.umbrales.mejora_max)).sum()
+        fortalecidos = (df_ficha['resultado'] >= config.umbrales.mejora_max).sum()
+        
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
+        
+        with col1:
+            st.metric(
+                "Grupos Evaluados",
+                grupos_evaluados,
+                help="Total de grupos únicos evaluados"
+            )
+        
+        with col2:
+            st.metric(
+                "Total Observaciones",
+                total_evaluaciones,
+                help="Total de observaciones registradas"
+            )
+        
+        with col3:
+            st.markdown(f"""<p style="font-size: 15px; font-type:normal; margin-bottom: 0px;">
+                        Estado Patrimonial General</p>
+                <div style="
+                    width: 40px;
+                    margin-top: 5px;
+                    height: 40px;
+                    background-color: {color_estado_general};
+                    border-radius: 5px;
+                "></div>""", unsafe_allow_html=True)
             
-            with col_info1:
-                grupos_ficha = df_ficha['codigo_grupo'].nunique()
-                st.metric("Grupos Evaluados", grupos_ficha)
-            
-            with col_info2:
-                promedio_ficha = df_ficha['resultado'].mean()
-                st.metric("Promedio de Ficha", f"{promedio_ficha:.2f}")
-            
-            with col_info3:
-                evaluaciones_ficha = len(df_ficha)
-                st.metric("Total Evaluaciones", evaluaciones_ficha)
-            
-            # Análisis por dimensión dentro de la ficha
-            st.markdown("**Desempeño por Dimensión:**")
-            
-            df_dim_ficha = (df_ficha
-                .groupby('dimension', as_index=False)
-                .agg(
-                    promedio=('resultado', 'mean'),
-                    evaluaciones=('resultado', 'count')
-                )
-                .sort_values('promedio', ascending=False)
+        
+        with col4:
+            st.metric(
+                "🔴 En Riesgo",
+                en_riesgo,
+                delta=f"{(en_riesgo/grupos_evaluados*100):.1f}%" if grupos_evaluados > 0 else None,
+                delta_color="inverse",
+                help="Grupos con promedio < 0.8"
+            )
+        
+        with col5:
+            st.metric(
+                "🟡 Por Mejorar",
+                por_mejorar,
+                delta=f"{(por_mejorar/grupos_evaluados*100):.1f}%" if grupos_evaluados > 0 else None,
+                help="Grupos con promedio entre 0.8 y 1.6"
+            )
+        
+        with col6:
+            st.metric(
+                "🟢 Fortalecidos",
+                fortalecidos,
+                delta=f"{(fortalecidos/grupos_evaluados*100):.1f}%" if grupos_evaluados > 0 else None,
+                help="Grupos con promedio ≥ 1.6"
             )
             
-            chart_dim = alt.Chart(df_dim_ficha).mark_bar().encode(
-                x=alt.X('dimension:N', title='Dimensión'),
-                y=alt.Y('promedio:Q', title='Promedio', scale=alt.Scale(domain=[0, 2])),
-                color=alt.Color(
-                    'promedio:Q',
-                    scale=alt.Scale(
-                        domain=[0, 0.67, 1.33, 2],
-                        range=['#d73027', '#fee08b', '#d9ef8b', '#1a9850']
-                    ),
-                    legend=None
+        # Análisis por dimensión dentro de la ficha
+        st.markdown("**Desempeño por Dimensión:**")
+        
+        df_dim_ficha = (df_ficha
+            .groupby('dimension', as_index=False)
+            .agg(
+                promedio=('resultado', 'mean'),
+                evaluaciones=('resultado', 'count')
+            )
+            .sort_values('promedio', ascending=False)
+        )
+            
+        chart_dim = alt.Chart(df_dim_ficha).mark_bar().encode(
+            y=alt.Y('dimension:N', title='Dimensión'),
+            x=alt.X('promedio:Q', title='Estado', scale=alt.Scale(domain=[0, 2]), axis=alt.Axis(labels=False)),
+            color=alt.Color(
+                'promedio:Q',
+                scale=alt.Scale(
+                    domain=[0, config.umbrales.riesgo_max,1, config.umbrales.mejora_max, 2],
+                    range=['#DA0024', "#feb98b", '#FFCA00', '#b3ef8b', '#00AD1B']
                 ),
-                tooltip=[
-                    'dimension',
-                    alt.Tooltip('promedio:Q', format='.2f'),
-                    'evaluaciones'
-                ]
-            ).properties(height=250)
-            
-            st.altair_chart(chart_dim, use_container_width=True)
-            
-            # Top grupos de esta ficha
-            st.markdown("**🏆 Top 5 Grupos de esta Ficha:**")
-            
-            df_grupos_ficha = (df_ficha
-                .groupby(['codigo_grupo', 'nombre_propuesta'], as_index=False)
+                legend=None
+            ),
+            tooltip=[
+                'dimension',
+                #alt.Tooltip('promedio:Q', format='.2f'),
+                'evaluaciones'
+            ]
+        ).properties(height=250)
+        
+        st.altair_chart(chart_dim, use_container_width=True)
+        
+        # Top grupos de esta ficha
+        st.markdown("**🏆 Top 5 Grupos de esta Ficha:**")
+        
+        df_grupos_ficha = (df_ficha
+            .groupby(['codigo_grupo', 'nombre_propuesta'], as_index=False)
+            .agg(promedio=('resultado', 'mean'))
+            .nlargest(5, 'promedio')
+        )
+    
+        df_grupos_ficha['resultado_emoji'] = df_grupos_ficha['promedio'].apply(estado_patrimonial)
+        st.dataframe(
+            df_grupos_ficha.style.format({'promedio': '{:.2f}'}),
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                'codigo_grupo': 'Código',
+                'nombre_propuesta': 'Grupo',
+                'resultado_emoji': 'Estado',
+                #'promedio': st.column_config.NumberColumn('Promedio', format='%.2f')
+                'promedio': None
+            }
+        )
+        
+        # Aspectos más fuertes y débiles de esta ficha
+        col_asp1, col_asp2 = st.columns(2)
+        
+        with col_asp1:
+            st.markdown("**🟢 Aspectos Más Fuertes:**")
+            df_asp_fuerte = (df_ficha
+                .groupby('aspecto', as_index=False)
                 .agg(promedio=('resultado', 'mean'))
                 .nlargest(5, 'promedio')
             )
-            
+            df_asp_fuerte['resultado_emoji'] = df_asp_fuerte['promedio'].apply(estado_patrimonial)
             st.dataframe(
-                df_grupos_ficha.style.format({'promedio': '{:.2f}'}),
+                df_asp_fuerte.style.format({'promedio': '{:.2f}'}),
                 use_container_width=True,
-                hide_index=True
+                hide_index=True,
+                column_config={
+                    'aspecto': 'Aspecto',
+                    'resultado_emoji': 'Estado',
+                    'promedio': None
+                }
             )
-            
-            # Aspectos más fuertes y débiles de esta ficha
-            col_asp1, col_asp2 = st.columns(2)
-            
-            with col_asp1:
-                st.markdown("**🟢 Aspectos Más Fuertes:**")
-                df_asp_fuerte = (df_ficha
-                    .groupby('aspecto', as_index=False)
-                    .agg(promedio=('resultado', 'mean'))
-                    .nlargest(5, 'promedio')
-                )
-                st.dataframe(
-                    df_asp_fuerte.style.format({'promedio': '{:.2f}'}),
-                    use_container_width=True,
-                    hide_index=True
-                )
-            
-            with col_asp2:
-                st.markdown("**🔴 Aspectos a Fortalecer:**")
-                df_asp_debil = (df_ficha
-                    .groupby('aspecto', as_index=False)
-                    .agg(promedio=('resultado', 'mean'))
-                    .nsmallest(5, 'promedio')
-                )
-                st.dataframe(
-                    df_asp_debil.style.format({'promedio': '{:.2f}'}),
-                    use_container_width=True,
-                    hide_index=True
-                )
+        
+        with col_asp2:
+            st.markdown("**🔴 Aspectos a Fortalecer:**")
+            df_asp_debil = (df_ficha
+                .groupby('aspecto', as_index=False)
+                .agg(promedio=('resultado', 'mean'))
+                .nsmallest(5, 'promedio')
+            )
+            df_asp_debil['resultado_emoji'] = df_asp_debil['promedio'].apply(estado_patrimonial)
+            st.dataframe(
+                df_asp_debil.style.format({'promedio': '{:.2f}'}),
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    'aspecto': 'Aspecto',
+                    'resultado_emoji': 'Estado',
+                    'promedio': None
+                }
+            )
 
 def mostrar_analisis_curadores(df_eval: pd.DataFrame):
     """Análisis por curadores - Mejorado"""
