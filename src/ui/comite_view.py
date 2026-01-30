@@ -1357,13 +1357,15 @@ def mostrar_analisis_curadores(df_eval: pd.DataFrame):
         st.metric("Total Curadores", len(df_cur))
     
     with col2:
+        
         st.metric("Promedio Evaluaciones/Curador", f"{df_cur['total_evaluaciones'].mean():.0f}")
+
+    #with col3:
+        
+        #st.metric("Promedio General Otorgado", f"{df_cur['promedio_otorgado'].mean():.2f}")
     
-    with col3:
-        st.metric("Promedio General Otorgado", f"{df_cur['promedio_otorgado'].mean():.2f}")
-    
-    with col4:
-        st.metric("Desviación Estándar", f"{df_cur['promedio_otorgado'].std():.2f}")
+    #with col4:
+        #st.metric("Desviación Estándar", f"{df_cur['promedio_otorgado'].std():.2f}")
     
     st.markdown("---")
     
@@ -1383,7 +1385,7 @@ def mostrar_analisis_curadores(df_eval: pd.DataFrame):
         tooltip=[
             'curador', 
             'grupos_evaluados',
-            alt.Tooltip('promedio_otorgado:Q', format='.2f', title='Promedio'),
+            #alt.Tooltip('promedio_otorgado:Q', format='.2f', title='Promedio'),
             'total_evaluaciones'
         ]
     ).properties(height=300)
@@ -1391,10 +1393,10 @@ def mostrar_analisis_curadores(df_eval: pd.DataFrame):
     st.altair_chart(chart1, use_container_width=True)
     
     
-    st.subheader("📈 Promedio Otorgado por Curador")
+    st.subheader("📈 Estado Otorgado por Curador")
     chart2 = alt.Chart(df_cur).mark_bar().encode(
         x=alt.X('curador:N', title='Curador', sort='-y'),
-        y=alt.Y('promedio_otorgado:Q', title='Promedio', scale=alt.Scale(domain=[0, 2])),
+        y=alt.Y('promedio_otorgado:Q', title='Estado', scale=alt.Scale(domain=[0, 2]), axis=alt.Axis(labels=False)),
         color=alt.Color(
             'promedio_otorgado:Q',
             scale=alt.Scale(
@@ -1405,15 +1407,16 @@ def mostrar_analisis_curadores(df_eval: pd.DataFrame):
         ),
         tooltip=[
             'curador', 
-            alt.Tooltip('promedio_otorgado:Q', format='.2f', title='Promedio'),
-            alt.Tooltip('mediana_otorgada:Q', format='.2f', title='Mediana'),
-            alt.Tooltip('desviacion:Q', format='.2f', title='Desv. Est.'),
+            #alt.Tooltip('promedio_otorgado:Q', format='.2f', title='Promedio'),
+            #alt.Tooltip('mediana_otorgada:Q', format='.2f', title='Mediana'),
+            #alt.Tooltip('desviacion:Q', format='.2f', title='Desv. Est.'),
             'total_evaluaciones'
         ]
     ).properties(height=300)
     
     st.altair_chart(chart2, use_container_width=True)
     
+    """
     # Gráfico de distribución de calificaciones
     st.markdown("---")
     st.subheader("📊 Distribución de Calificaciones por Curador")
@@ -1425,7 +1428,8 @@ def mostrar_analisis_curadores(df_eval: pd.DataFrame):
     ).properties(height=400)
     
     st.altair_chart(chart_dist, use_container_width=True)
-    
+    """
+    """
     # Tabla detallada mejorada
     st.markdown("---")
     st.subheader("📋 Detalle por Curador")
@@ -1461,7 +1465,43 @@ def mostrar_analisis_curadores(df_eval: pd.DataFrame):
             '%_riesgo': st.column_config.NumberColumn('% 🔴', format='%.1f')
         }
     )
-    
+    """
+    # Tabla detallada mejorada
+    st.markdown("---")
+    st.subheader("📋 Detalle por Curador")
+    st.dataframe(
+        df_cur[['curador', 'grupos_evaluados', 'total_evaluaciones', 'eval_por_grupo',
+               
+               'fichas_evaluadas', 'fortaleza', 'oportunidad', 'riesgo',
+               '%_fortaleza', '%_oportunidad', '%_riesgo']].style.format({
+            'promedio_otorgado': '{:.2f}',
+            'mediana_otorgada': '{:.2f}',
+            'desviacion': '{:.2f}',
+            'eval_por_grupo': '{:.1f}',
+            '%_fortaleza': '{:.1f}',
+            '%_oportunidad': '{:.1f}',
+            '%_riesgo': '{:.1f}'
+        }),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            'curador': 'Curador',
+            'grupos_evaluados': st.column_config.NumberColumn('Grupos', format='%d'),
+            'total_evaluaciones': st.column_config.NumberColumn('Evaluaciones', format='%d'),
+            'eval_por_grupo': st.column_config.NumberColumn('Eval/Grupo', format='%.1f'),
+            'promedio_otorgado': st.column_config.NumberColumn('Promedio', format='%.2f'),
+            'mediana_otorgada': st.column_config.NumberColumn('Mediana', format='%.2f'),
+            'desviacion': st.column_config.NumberColumn('Desv. Est.', format='%.2f'),
+            'fichas_evaluadas': st.column_config.NumberColumn('Fichas', format='%d'),
+            'fortaleza': st.column_config.NumberColumn('🟢', format='%d'),
+            'oportunidad': st.column_config.NumberColumn('🟡', format='%d'),
+            'riesgo': st.column_config.NumberColumn('🔴', format='%d'),
+            '%_fortaleza': st.column_config.NumberColumn('% 🟢', format='%.1f'),
+            '%_oportunidad': st.column_config.NumberColumn('% 🟡', format='%.1f'),
+            '%_riesgo': st.column_config.NumberColumn('% 🔴', format='%.1f')
+        }
+    )
+    """
     # Análisis comparativo
     st.markdown("---")
     st.subheader("🔍 Análisis Comparativo")
@@ -1493,6 +1533,7 @@ def mostrar_analisis_curadores(df_eval: pd.DataFrame):
             hide_index=True
         )
     
+    
     # Análisis de consistencia
     st.markdown("---")
     st.subheader("📏 Análisis de Consistencia")
@@ -1518,7 +1559,7 @@ def mostrar_analisis_curadores(df_eval: pd.DataFrame):
         st.metric("Promedio de Grupos/Curador", f"{df_cur['grupos_evaluados'].mean():.1f}")
         st.metric("Promedio de Evaluaciones/Curador", f"{df_cur['total_evaluaciones'].mean():.1f}")
         st.metric("Desviación Estándar de Promedios", f"{df_cur['promedio_otorgado'].std():.2f}")
-
+    """
 
 def mostrar_panel_admin():
     """Panel de administración para sincronización de datos"""
