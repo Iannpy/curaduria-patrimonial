@@ -7,7 +7,7 @@ import pandas as pd
 def mostrar_evaluaciones_detalladas(df_eval: pd.DataFrame) -> None:
     """Tabla detallada de todas las evaluaciones"""
 
-    st.header("📋 Evaluaciones Detalladas")
+    st.header("Evaluaciones Detalladas")
     st.caption("Vista completa de todas las evaluaciones por aspecto")
 
     # Opciones de visualización
@@ -29,7 +29,20 @@ def mostrar_evaluaciones_detalladas(df_eval: pd.DataFrame) -> None:
     with col_opt3:
         st.markdown("<br>", unsafe_allow_html=True)
         # Export placeholder; real export implemented in exports.py if needed
-
+    df_eval1 = df_eval.copy()
+    df_eval1['resultado_emoji'] = df_eval1['resultado'].map({2: '🟢', 1: '🟡', 0: '🔴'})
+    st.dataframe(
+        df_eval1[[
+            'curador', 'codigo_grupo', 'nombre_propuesta', 'ficha_grupo',
+            'modalidad', 'dimension', 'aspecto', 'resultado_emoji',
+            'observacion', 'fecha_registro', 'resultado'
+        ]].sort_values('fecha_registro', ascending=False),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            'resultado_emoji': st.column_config.TextColumn('Estado')
+        }
+    )
     # Filtrar
     df_mostrar = df_eval.copy()
     if buscar:
@@ -57,12 +70,12 @@ def mostrar_evaluaciones_detalladas(df_eval: pd.DataFrame) -> None:
         df_mostrar[[
             'curador', 'codigo_grupo', 'nombre_propuesta', 'ficha_grupo',
             'modalidad', 'dimension', 'aspecto', 'resultado_emoji',
-            'observacion', 'fecha_registro'
+            'observacion', 'fecha_registro', 'resultado'
         ]].sort_values('fecha_registro', ascending=False),
         use_container_width=True,
         hide_index=True,
         column_config={
-            'resultado_emoji': st.column_config.TextColumn('Resultado')
+            'resultado_emoji': st.column_config.TextColumn('Estado')
         }
     )
 

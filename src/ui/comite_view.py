@@ -210,8 +210,20 @@ def mostrar_vista_comite():
     
     # Sidebar - Navegación
     with st.sidebar:
+        icons = [
+        "speedometer2",        # Dashboard General
+        "clipboard-data",      # Evaluaciones Detalladas
+        "people",              # Análisis por Grupos
+        "file-earmark-bar-graph",  # Análisis por Ficha
+        "diagram-3",           # Análisis por Dimensión
+        "bounding-box",        # Análisis por Aspecto
+        "person-check",        # Análisis por Curador
+        "folder2-open",        # Gestión de Fichas
+        "shield-lock",         # Administración
+        "people-fill"          # Gestión de Usuarios
+        ]
         pagina = option_menu(
-            "📂 Menú de Análisis",
+            "Menú de Análisis",
             [
                 "Dashboard General",
                 "Evaluaciones Detalladas",
@@ -224,19 +236,8 @@ def mostrar_vista_comite():
                 "Administración",
                 "Gestión de Usuarios"
             ],
-            icons=[
-                "bar-chart-fill",
-                "table",
-                "people-fill",
-                "layers-fill",
-                "layers-fill",
-                "layers-fill",
-                "check2-square",
-                "person-badge-fill",
-                "gear-fill",
-                "people"
-            ],
-            menu_icon="clipboard-data-fill",
+            icons=icons,
+            menu_icon="clipboard-data",
             default_index=0,
             orientation="vertical",
         )
@@ -338,7 +339,7 @@ def mostrar_evaluaciones_detalladas(df_eval: pd.DataFrame) -> None:
         df_mostrar[[
             'curador', 'codigo_grupo', 'nombre_propuesta', 
             'modalidad', 'dimension', 'aspecto', 'resultado_emoji', 
-            'observacion', 'fecha_registro'
+            'observacion', 'fecha_registro', 'resultado'
         ]].sort_values('fecha_registro', ascending=False),
         use_container_width=True,
         hide_index=True,
@@ -1154,37 +1155,48 @@ def mostrar_analisis_por_ficha(df_eval: pd.DataFrame):
         if df_ficha.empty:
             st.warning(f"No hay evaluaciones para la ficha '{ficha_seleccionada}'")
         
+        df_promedios_ficha = (df_ficha
+                .groupby(['codigo_grupo', 'nombre_propuesta', 'ficha'], as_index=False)
+                .agg(promedio_final=('resultado', 'mean'))
+                .dropna(subset=['promedio_final'])
+            )
+            
+        if df_promedios_ficha.empty:
+            st.warning("⚠️ No hay evaluaciones completas para calcular promedios")
+            return
+        
+        df_promedios_ficha['estado'] = df_promedios_ficha['promedio_final'].apply(estado_patrimonial)
 
-        total_evaluaciones = len(df_eval)
-        curadores_activos = df_eval['curador'].nunique()
-        grupos_evaluados = df_ficha['codigo_grupo'].nunique()
-        promedio_general = df_ficha['resultado'].mean()
+        total_evaluaciones_ficha= len(df_ficha)
+        curadores_activos = df_ficha['curador'].nunique()
+        grupos_evaluados_ficha = df_promedios_ficha['codigo_grupo'].nunique()
+        promedio_general_ficha = df_promedios_ficha['promedio_final'].mean()
         desviacion_std = df_ficha['resultado'].std()
 
-        color_estado_general = color_gradiente(promedio_general)
+        color_estado_general = color_gradiente(promedio_general_ficha)
 
         
 
         
         # Calcular estados
-        en_riesgo = (df_ficha['resultado'] < config.umbrales.riesgo_max).sum()
-        por_mejorar = ((df_ficha['resultado'] >= config.umbrales.riesgo_max) & 
-                    (df_ficha['resultado'] < config.umbrales.mejora_max)).sum()
-        fortalecidos = (df_ficha['resultado'] >= config.umbrales.mejora_max).sum()
+        en_riesgo_ficha = (df_promedios_ficha['promedio_final'] < config.umbrales.riesgo_max).sum()
+        por_mejorar_ficha = ((df_promedios_ficha['promedio_final'] >= config.umbrales.riesgo_max) & 
+                    (df_promedios_ficha['promedio_final'] < config.umbrales.mejora_max)).sum()
+        fortalecidos_ficha = (df_promedios_ficha['promedio_final'] >= config.umbrales.mejora_max).sum()
         
         col1, col2, col3, col4, col5, col6 = st.columns(6)
         
         with col1:
             st.metric(
                 "Grupos Evaluados",
-                grupos_evaluados,
+                grupos_evaluados_ficha,
                 help="Total de grupos únicos evaluados"
             )
         
         with col2:
             st.metric(
                 "Total Observaciones",
-                total_evaluaciones,
+                total_evaluaciones_ficha,
                 help="Total de observaciones registradas"
             )
         
@@ -1203,8 +1215,8 @@ def mostrar_analisis_por_ficha(df_eval: pd.DataFrame):
         with col4:
             st.metric(
                 "🔴 En Riesgo",
-                en_riesgo,
-                delta=f"{(en_riesgo/grupos_evaluados*100):.1f}%" if grupos_evaluados > 0 else None,
+                en_riesgo_ficha,
+                delta=f"{(en_riesgo_ficha/grupos_evaluados_ficha*100):.1f}%" if grupos_evaluados_ficha > 0 else None,
                 delta_color="inverse",
                 help="Grupos con promedio < 0.8"
             )
@@ -1212,16 +1224,16 @@ def mostrar_analisis_por_ficha(df_eval: pd.DataFrame):
         with col5:
             st.metric(
                 "🟡 Por Mejorar",
-                por_mejorar,
-                delta=f"{(por_mejorar/grupos_evaluados*100):.1f}%" if grupos_evaluados > 0 else None,
+                por_mejorar_ficha,
+                delta=f"{((por_mejorar_ficha/grupos_evaluados_ficha)*100):.1f}%" if grupos_evaluados_ficha > 0 else None,
                 help="Grupos con promedio entre 0.8 y 1.6"
             )
         
         with col6:
             st.metric(
                 "🟢 Fortalecidos",
-                fortalecidos,
-                delta=f"{(fortalecidos/grupos_evaluados*100):.1f}%" if grupos_evaluados > 0 else None,
+                fortalecidos_ficha,
+                delta=f"{((fortalecidos_ficha/grupos_evaluados_ficha)*100):.1f}%" if grupos_evaluados_ficha > 0 else None,
                 help="Grupos con promedio ≥ 1.6"
             )
             
