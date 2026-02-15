@@ -325,6 +325,9 @@ def mostrar_vista_curador():
                 label_visibility="collapsed",
                 help="Esta observación aplicará a todos los aspectos evaluados en esta ficha"
             )
+            #si la observación esta vacía que sea igual a no aplica
+            if not observacion_global.strip():
+                observacion_global = "No aplica / no hay comentarios"
 
             st.markdown("---")
             
