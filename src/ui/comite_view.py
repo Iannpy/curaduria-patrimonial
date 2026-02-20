@@ -11,6 +11,7 @@ from src.config import config
 from src.database.models import EvaluacionModel, AspectoModel, FichaModel, FichaDimensionModel
 from src.auth.authentication import crear_boton_logout
 from streamlit_option_menu import option_menu
+from .comite.congos_oro_view import mostrar_dashboard as mostrar_congos_oro
 from .comite.utils import estado_patrimonial, estado_patrimonial_texto
 from .comite.exports import generar_pdf_grupo, crear_backup_zip
 from .comite.dashboard import mostrar_dashboard, color_gradiente
@@ -18,7 +19,6 @@ from .comite.dashboard import mostrar_dashboard, color_gradiente
 logger = logging.getLogger(__name__)
 
 import numpy as np
-
 
 
 
@@ -212,6 +212,7 @@ def mostrar_vista_comite():
     with st.sidebar:
         icons = [
         "speedometer2",        # Dashboard General
+        "trophy",             # Congos de Oro
         "clipboard-data",      # Evaluaciones Detalladas
         "people",              # Análisis por Grupos
         "file-earmark-bar-graph",  # Análisis por Ficha
@@ -226,6 +227,7 @@ def mostrar_vista_comite():
             "Menú de Análisis",
             [
                 "Dashboard General",
+                "Congos de Oro",
                 "Evaluaciones Detalladas",
                 "Análisis por Grupos",
                 "Análisis por Ficha",
@@ -259,6 +261,8 @@ def mostrar_vista_comite():
     # Routing según página seleccionada
     if pagina == "Dashboard General":
         mostrar_dashboard(df_eval)
+    elif pagina == "Congos de Oro":
+        mostrar_congos_oro()
     elif pagina == "Evaluaciones Detalladas":
         mostrar_evaluaciones_detalladas(df_eval)
     elif pagina == "Análisis por Grupos":
@@ -297,7 +301,7 @@ def mostrar_evaluaciones_detalladas(df_eval: pd.DataFrame) -> None:
         )
     
     with col_opt2:
-        st.markdown("<br>", unsafe_allow_html=True)
+        
         filtro_resultado = st.selectbox(
             "Filtrar por resultado",
             ["Todos", "🟢 Fortaleza (2)", "🟡 Oportunidad (1)", "🔴 Riesgo (0)"]
