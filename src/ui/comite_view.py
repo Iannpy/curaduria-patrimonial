@@ -11,7 +11,7 @@ from src.config import config
 from src.database.models import EvaluacionModel, AspectoModel, FichaModel, FichaDimensionModel
 from src.auth.authentication import crear_boton_logout
 from streamlit_option_menu import option_menu
-from .comite.congos_oro_view import mostrar_dashboard as mostrar_congos_oro
+from .comite.congos_oro_view import mostrar_congos_oro
 from .comite.utils import estado_patrimonial, estado_patrimonial_texto
 from .comite.exports import generar_pdf_grupo, crear_backup_zip
 from .comite.dashboard import mostrar_dashboard, color_gradiente

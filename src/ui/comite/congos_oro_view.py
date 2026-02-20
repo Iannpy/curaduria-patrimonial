@@ -1,24 +1,56 @@
 """
-Dashboard de Congos de Oro Consolidados
-Vista para el Comité Técnico
-
-Coloca este archivo en: src/ui/comite/congos_oro_view.py
-O ejecútalo standalone: streamlit run dashboard_congos_oro.py
+Vista de Congos de Oro - FIXED para VPS
+Usa rutas configurables desde config.py y detecta archivos automáticamente
 """
-
 import streamlit as st
 import pandas as pd
 import sqlite3
 from pathlib import Path
+from src.config import DATA_DIR
 from .dashboard import color_gradiente
 
 # ═══════════════════════════════════════════════════════════════════
-# CONFIGURACIÓN
+# CONFIGURACIÓN - Rutas dinámicas
 # ═══════════════════════════════════════════════════════════════════
 
-DB_FIN_SEMANA = "data\curaduria_finde.db"
-DB_GRAN_PARADA = "data\curaduria_granparada.db"
+def obtener_rutas_bds():
+    """
+    Detecta automáticamente las rutas de las bases de datos
+    Busca en DATA_DIR los archivos .db disponibles
+    """
+    data_path = Path(DATA_DIR)
+    
+    # Buscar archivos .db
+    archivos_db = list(data_path.glob("*.db"))
+    
+    # Intentar identificar las BDs por nombre
+    db_fin = None
+    db_gran = None
+    
+    for archivo in archivos_db:
+        nombre = archivo.stem.lower()
+        if 'fin' in nombre or 'finde' in nombre or 'semana' in nombre:
+            db_fin = str(archivo)
+        elif 'gran' in nombre or 'parada' in nombre:
+            db_gran = str(archivo)
+    
+    # Si no se encuentran con esos nombres, usar los dos primeros .db
+    if db_fin is None or db_gran is None:
+        if len(archivos_db) >= 2:
+            db_fin = str(archivos_db[0])
+            db_gran = str(archivos_db[1])
+        elif len(archivos_db) == 1:
+            # Solo hay una BD, usarla para ambos
+            db_fin = str(archivos_db[0])
+            db_gran = str(archivos_db[0])
+    
+    return db_fin, db_gran
 
+
+# Obtener rutas dinámicamente
+DB_FIN_SEMANA, DB_GRAN_PARADA = obtener_rutas_bds()
+
+# Configuración de ponderaciones
 PONDERACIONES = {
     "CONGO": {"fin_semana": 0.60, "gran_parada": 0.40},
     "CUMBIA": {"fin_semana": 0.60, "gran_parada": 0.40},
@@ -36,42 +68,79 @@ PONDERACIONES = {
 UMBRAL_RIESGO = 0.8
 UMBRAL_MEJORA = 1.6
 
+
 # ═══════════════════════════════════════════════════════════════════
 # FUNCIONES
 # ═══════════════════════════════════════════════════════════════════
 
 @st.cache_data
-def cargar_datos():
+def cargar_y_consolidar_datos():
     """Carga y consolida datos de ambos eventos"""
     
+    # Verificar que existan las BDs
+    if DB_FIN_SEMANA is None or DB_GRAN_PARADA is None:
+        st.error("❌ No se encontraron bases de datos en la carpeta data/")
+        st.info(f"📂 Buscando en: {DATA_DIR}")
+        return pd.DataFrame()
+    
     def obtener_evaluaciones(db_path):
-        conn = sqlite3.connect(db_path)
-        query = """
-            SELECT 
-                e.codigo_grupo,
-                g.nombre_propuesta,
-                g.modalidad,
-                g.tipo,
-                g.tamano,
-                f.codigo as ficha_codigo,
-                f.nombre as ficha_nombre,
-                AVG(e.resultado) as promedio
-            FROM evaluaciones e
-            JOIN grupos g ON e.codigo_grupo = g.codigo
-            JOIN fichas f ON e.ficha_id = f.id
-            GROUP BY e.codigo_grupo, f.id
-        """
-        df = pd.read_sql_query(query, conn)
-        conn.close()
-        return df
+        """Obtiene evaluaciones de una BD"""
+        if not Path(db_path).exists():
+            st.warning(f"⚠️ No se encuentra: {db_path}")
+            return pd.DataFrame()
+        
+        try:
+            conn = sqlite3.connect(db_path)
+            query = """
+                SELECT 
+                    e.codigo_grupo,
+                    g.nombre_propuesta,
+                    g.modalidad,
+                    g.tipo,
+                    g.tamano,
+                    f.codigo as ficha_codigo,
+                    f.nombre as ficha_nombre,
+                    AVG(e.resultado) as promedio
+                FROM evaluaciones e
+                JOIN grupos g ON e.codigo_grupo = g.codigo
+                JOIN fichas f ON e.ficha_id = f.id
+                GROUP BY e.codigo_grupo, f.id
+            """
+            df = pd.read_sql_query(query, conn)
+            conn.close()
+            return df
+        except Exception as e:
+            st.error(f"❌ Error leyendo {db_path}: {e}")
+            return pd.DataFrame()
     
+    # Cargar datos
     df_fin = obtener_evaluaciones(DB_FIN_SEMANA)
-    df_fin['evento'] = 'Fin de Semana'
-    
     df_gran = obtener_evaluaciones(DB_GRAN_PARADA)
-    df_gran['evento'] = 'Gran Parada'
     
-    # Consolidar
+    # Si alguna está vacía, mostrar info
+    if df_fin.empty and df_gran.empty:
+        st.error("❌ No se pudieron cargar datos de ninguna base de datos")
+        return pd.DataFrame()
+    
+    if df_fin.empty:
+        st.warning(f"⚠️ Base de datos vacía: {Path(DB_FIN_SEMANA).name}")
+        # Usar solo Gran Parada
+        df_gran['promedio_fin'] = None
+        df_gran['promedio_gran'] = df_gran['promedio']
+        df_gran['nota_consolidada'] = df_gran['promedio']
+        df_gran['participacion'] = "Gran Parada"
+        return df_gran
+    
+    if df_gran.empty:
+        st.warning(f"⚠️ Base de datos vacía: {Path(DB_GRAN_PARADA).name}")
+        # Usar solo Fin de Semana
+        df_fin['promedio_fin'] = df_fin['promedio']
+        df_fin['promedio_gran'] = None
+        df_fin['nota_consolidada'] = df_fin['promedio']
+        df_fin['participacion'] = "Fin de Semana"
+        return df_fin
+    
+    # Consolidar ambas
     todos_codigos = set(df_fin['codigo_grupo'].unique()) | set(df_gran['codigo_grupo'].unique())
     
     resultados = []
@@ -120,13 +189,18 @@ def cargar_datos():
     
     return pd.DataFrame(resultados)
 
+
 def calcular_congos_oro(df):
-    """Calcula Congos de Oro por ficha"""
+    """Calcula Congos de Oro por ficha (Top 25%)"""
+    if df.empty:
+        return pd.DataFrame()
+    
     congos = []
     
     for ficha in df['ficha_codigo'].unique():
         df_ficha = df[df['ficha_codigo'] == ficha]
         
+        # Caso especial: CUMBIA separada por tamaño
         if ficha == "CUMBIA":
             for tamano in ['GRANDE', 'MEDIANO']:
                 df_tam = df_ficha[df_ficha['tamano'] == tamano]
@@ -148,87 +222,39 @@ def calcular_congos_oro(df):
         return df_congos
     return pd.DataFrame()
 
-# ═══════════════════════════════════════════════════════════════════
-# DASHBOARD
-# ═══════════════════════════════════════════════════════════════════
 
-def mostrar_dashboard():
-    st.markdown("""
-    <style>
-    /* ===== IDENTIDAD GENERAL ===== */
-    html, body, [class*="css"]  {
-        font-family: 'Inter', 'Segoe UI', sans-serif;
-    }
-
-    /* Fondo general */
-    .main {
-        background-color: #F7F8FA;
-    }
-
-    /* Títulos principales */
-    h1, h2, h3 {
-        font-weight: 700;
-        letter-spacing: -0.02em;
-    }
-
-    /* Subtítulos */
-    h3 {
-        color: #1F2937;
-    }
-
-    /* ===== TARJETAS KPI ===== */
-    div[data-testid="metric-container"] {
-        background-color: white;
-        border-radius: 12px;
-        padding: 12px;
-        border: 1px solid #E5E7EB;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.03);
-    }
-
-    /* ===== TABS ===== */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 20px;
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        font-weight: 600;
-    }
-
-    /* ===== TABLAS ===== */
-    [data-testid="stDataFrame"] {
-        background-color: white;
-        border-radius: 14px;
-        border: 1px solid #E5E7EB;
-        box-shadow: 0 6px 16px rgba(0,0,0,0.05);
-    }
-
-    /* ===== CABECERAS DE TABLA ===== */
-    thead tr th {
-        background-color: #F3F4F6 !important;
-        font-weight: 600;
-        color: #111827;
-    }
-
-    /* ===== BOTONES ===== */
-    button[kind="primary"] {
-        background-color: #111827;
-        border-radius: 10px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    st.title("🏆 Congos de Oro - Consolidado 2026")
-    #st.caption("Evaluaciones consolidadas: Fin de Semana de la Tradición + Gran Parada de Tradición")
+def mostrar_congos_oro():
+    """Vista principal de Congos de Oro"""
+    
+    st.caption("Evaluaciones consolidadas: Fin de Semana de la Tradición + Gran Parada de Tradición")
+    
+    # Mostrar info de BDs detectadas
+    with st.expander("ℹ️ Información de Bases de Datos"):
+        if DB_FIN_SEMANA:
+            st.success(f"✅ Fin de Semana: {Path(DB_FIN_SEMANA).name}")
+        else:
+            st.error("❌ No se encontró BD de Fin de Semana")
+        
+        if DB_GRAN_PARADA:
+            st.success(f"✅ Gran Parada: {Path(DB_GRAN_PARADA).name}")
+        else:
+            st.error("❌ No se encontró BD de Gran Parada")
     
     # Cargar datos
     with st.spinner("Cargando datos..."):
-        df = cargar_datos()
+        df = cargar_y_consolidar_datos()
+        
+        if df.empty:
+            st.error("❌ No se pudieron cargar datos")
+            st.info("💡 Verifica que existan archivos .db en la carpeta data/")
+            return
+        
         df_congos = calcular_congos_oro(df)
-
     
     # KPIs principales
     st.markdown("### 📊 Métricas Generales")
     
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.metric("Total Grupos", len(df))
@@ -237,39 +263,25 @@ def mostrar_dashboard():
         st.metric("Congos de Oro", len(df_congos), 
                  delta=f"{len(df_congos)/len(df)*100:.1f}%")
     
-    promedio_general = df['nota_consolidada'].mean()
-    
-    
     with col3:
-        color = color_gradiente(promedio_general)
-        st.markdown(f"""Promedio General:<div style="
-                    width: 40px;
-                    height: 40px;
-                    background-color: {color};
-                    border-radius: 6px
-                "></div>""", unsafe_allow_html=True)
-    with col4:
-        riesgo = len(df[df['estado'] == "🔴 Riesgo"])
-        st.metric("🔴 Riesgo", riesgo, 
-                 delta=f"{riesgo/len(df)*100:.0f}%")
-    with col5:
-        mejora = len(df[df['estado'] == "🟡 Mejora"])
-        st.metric("🟡 Mejora", mejora, 
-                    delta=f"{mejora/len(df)*100:.0f}%")
+        st.metric("Promedio General", f"{df['nota_consolidada'].mean():.3f}")
     
-    with col6:
+    with col4:
         fortalecimiento = len(df[df['estado'] == "🟢 Fortalecimiento"])
         st.metric("🟢 Fortalecimiento", fortalecimiento,
                  delta=f"{fortalecimiento/len(df)*100:.0f}%")
     
-    #espacio en blanco
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("---")
     
     # Tabs
-    tab1, tab2, tab3 = st.tabs(["🏆 Congos de Oro", "📊 Todos los Grupos", "📈 Análisis por Modalidad"])
+    tab1, tab2, tab3 = st.tabs(["🏆 Congos de Oro", "📊 Todos los Grupos", "📈 Análisis por Ficha"])
     
     with tab1:
-        st.markdown("### 🏆 Congos de Oro (Top 25% por Modalidad)")
+        st.markdown("### 🏆 Congos de Oro (Top 25% por Ficha)")
+        
+        if df_congos.empty:
+            st.warning("⚠️ No se pudieron calcular Congos de Oro")
+            return
         
         # Filtro por categoría
         categorias = ['Todas'] + sorted(df_congos['categoria'].unique().tolist())
@@ -287,7 +299,6 @@ def mostrar_dashboard():
                 'nota_consolidada', 'promedio_fin', 'promedio_gran', 
                 'estado', 'participacion'
             ]],
-            height=35 * len(df_mostrar) + 40,
             use_container_width=True,
             hide_index=True,
             column_config={
@@ -308,75 +319,35 @@ def mostrar_dashboard():
         st.download_button(
             label="📥 Descargar CSV",
             data=csv,
-            file_name=f"congos_oro_{categoria_sel.lower().replace(' ', '_')}.csv",
+            file_name=f"congos_oro_{categoria_sel.lower().replace(' ', '_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
             mime="text/csv"
         )
     
     with tab2:
-        st.markdown("""
-        <div style="
-            background-color: white;
-            padding: 16px;
-            border-radius: 14px;
-            border: 1px solid #E5E7EB;
-            margin-bottom: 12px;
-        ">
-        <b>📊 Ranking Completo de los Grupos</b>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("### 📊 Ranking Completo de Grupos")
         
-
-        # ===== OPCIONES SUPERIORES =====
-        col_opt1, col_opt2, col_opt3 = st.columns([3, 1, 1])
-
-        with col_opt1:
-            buscar = st.text_input(
-                "🔍 Buscar",
-                placeholder="Buscar por código, nombre o ficha..."
-            )
-
-        with col_opt2:
-            
-            ficha_sel = st.selectbox(
-                "Filtrar por modalidad",
-                ["Todas"] + sorted(df['ficha_codigo'].dropna().unique().tolist())
-            )
-
-        with col_opt3:
-            
-            estado_sel = st.selectbox(
-                "Filtrar por estado",
-                ["Todos", "🟢 Fortalecimiento", "🟡 Mejora", "🔴 Riesgo"]
-            )
-
-        # ===== FILTRADO =====
-        df_mostrar = df.copy()
-
-        # Búsqueda global
-        if buscar:
-            df_mostrar = df_mostrar[
-                df_mostrar['codigo_grupo'].astype(str).str.contains(buscar, case=False, na=False) |
-                df_mostrar['nombre_propuesta'].str.contains(buscar, case=False, na=False) |
-                df_mostrar['ficha_codigo'].astype(str).str.contains(buscar, case=False, na=False)
-            ]
-
-        # Filtro por ficha
-        if ficha_sel != "Todas":
-            df_mostrar = df_mostrar[df_mostrar['ficha_codigo'] == ficha_sel]
-
-        # Filtro por estado
-        if estado_sel != "Todos":
-            df_mostrar = df_mostrar[df_mostrar['estado'] == estado_sel]
-
-        # Ordenar por ranking
-        df_mostrar = df_mostrar.sort_values(
-            'nota_consolidada',
-            ascending=False
-        )
-
-        # ===== TABLA =====
+        # Filtros
+        col1, col2 = st.columns(2)
+        with col1:
+            fichas = ['Todas'] + sorted(df['ficha_codigo'].unique().tolist())
+            ficha_sel = st.selectbox("Filtrar por ficha:", fichas)
+        
+        with col2:
+            estados = ['Todos', '🟢 Fortalecimiento', '🟡 Mejora', '🔴 Riesgo']
+            estado_sel = st.selectbox("Filtrar por estado:", estados)
+        
+        # Aplicar filtros
+        df_filtrado = df.copy()
+        if ficha_sel != 'Todas':
+            df_filtrado = df_filtrado[df_filtrado['ficha_codigo'] == ficha_sel]
+        if estado_sel != 'Todos':
+            df_filtrado = df_filtrado[df_filtrado['estado'] == estado_sel]
+        
+        df_filtrado = df_filtrado.sort_values('nota_consolidada', ascending=False)
+        
+        # Tabla
         st.dataframe(
-            df_mostrar[[
+            df_filtrado[[
                 'codigo_grupo', 'nombre_propuesta', 'ficha_codigo',
                 'nota_consolidada', 'promedio_fin', 'promedio_gran',
                 'estado', 'participacion'
@@ -387,24 +358,18 @@ def mostrar_dashboard():
                 'codigo_grupo': 'Código',
                 'nombre_propuesta': 'Nombre',
                 'ficha_codigo': 'Ficha',
-                'nota_consolidada': st.column_config.NumberColumn(
-                    'Nota Final', format="%.3f"
-                ),
-                'promedio_fin': st.column_config.NumberColumn(
-                    'Fin de Semana', format="%.3f"
-                ),
-                'promedio_gran': st.column_config.NumberColumn(
-                    'Gran Parada', format="%.3f"
-                ),
+                'nota_consolidada': st.column_config.NumberColumn('Nota Final', format="%.3f"),
+                'promedio_fin': st.column_config.NumberColumn('Fin de Semana', format="%.3f"),
+                'promedio_gran': st.column_config.NumberColumn('Gran Parada', format="%.3f"),
                 'estado': 'Estado',
                 'participacion': 'Eventos'
             }
         )
-
-        st.caption(f"Mostrando {len(df_mostrar)} de {len(df)} grupos")
+        
+        st.caption(f"Mostrando {len(df_filtrado)} de {len(df)} grupos")
     
     with tab3:
-        st.markdown("### 📈 Análisis por Modalidad")
+        st.markdown("### 📈 Análisis por Ficha")
         
         # Resumen por ficha
         resumen = []
@@ -421,12 +386,9 @@ def mostrar_dashboard():
                             'Total': len(df_tam),
                             'Congos de Oro': len(df_oro),
                             'Promedio': df_tam['nota_consolidada'].mean(),
-                            '🟢' : len(df_tam[df_tam['estado'] == "🟢 Fortalecimiento"]),
-                            '🟡' : len(df_tam[df_tam['estado'] == "🟡 Mejora"]),
-                            '🔴' : len(df_tam[df_tam['estado'] == "🔴 Riesgo"]),
-                            #'Máximo': df_tam['nota_consolidada'].max(),
-                            #'Mínimo': df_tam['nota_consolidada'].min(),
-                            #'Desv. Std': df_tam['nota_consolidada'].std()
+                            'Máximo': df_tam['nota_consolidada'].max(),
+                            'Mínimo': df_tam['nota_consolidada'].min(),
+                            'Desv. Std': df_tam['nota_consolidada'].std()
                         })
             else:
                 df_oro = df_ficha[df_ficha['nota_consolidada'] >= df_ficha['nota_consolidada'].quantile(0.75)]
@@ -435,39 +397,21 @@ def mostrar_dashboard():
                     'Total': len(df_ficha),
                     'Congos de Oro': len(df_oro),
                     'Promedio': df_ficha['nota_consolidada'].mean(),
-                    '🟢' : len(df_ficha[df_ficha['estado'] == "🟢 Fortalecimiento"]),
-                    '🟡' : len(df_ficha[df_ficha['estado'] == "🟡 Mejora"]),
-                    '🔴' : len(df_ficha[df_ficha['estado'] == "🔴 Riesgo"]),
-                    #'Máximo': df_ficha['nota_consolidada'].max(),
-                    #'Mínimo': df_ficha['nota_consolidada'].min(),
-                    #'Desv. Std': df_ficha['nota_consolidada'].std()
+                    'Máximo': df_ficha['nota_consolidada'].max(),
+                    'Mínimo': df_ficha['nota_consolidada'].min(),
+                    'Desv. Std': df_ficha['nota_consolidada'].std()
                 })
         
         df_resumen = pd.DataFrame(resumen)
         
-        st.data_editor(
+        st.dataframe(
             df_resumen,
-            height=35 * len(df_resumen) + 40,
-
             use_container_width=True,
             hide_index=True,
             column_config={
                 'Promedio': st.column_config.NumberColumn(format="%.3f"),
-                #'Máximo': st.column_config.NumberColumn(format="%.3f"),
-                #'Mínimo': st.column_config.NumberColumn(format="%.3f"),
-                #'Desv. Std': st.column_config.NumberColumn(format="%.3f"),
+                'Máximo': st.column_config.NumberColumn(format="%.3f"),
+                'Mínimo': st.column_config.NumberColumn(format="%.3f"),
+                'Desv. Std': st.column_config.NumberColumn(format="%.3f"),
             }
         )
-
-# ═══════════════════════════════════════════════════════════════════
-# EJECUCIÓN
-# ═══════════════════════════════════════════════════════════════════
-
-if __name__ == "__main__":
-    st.set_page_config(
-        page_title="Congos de Oro 2026",
-        page_icon="🏆",
-        layout="wide"
-    )
-    
-    mostrar_dashboard()
