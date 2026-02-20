@@ -50,7 +50,11 @@ class ConfiguracionApp:
     ano_evento: int = field(default_factory=lambda: int(os.getenv("ANO_EVENTO", "2026")))
     fecha_evento: str = field(default_factory=lambda: os.getenv("FECHA_EVENTO", str(datetime.datetime.today().strftime("%d/%m/%Y"))))
     # Rutas de archivos
-    db_path: str = field(default_factory=lambda: os.getenv("DB_PATH", str(DATA_DIR / "curaduria.db")))
+    db_path: Path = field(init=False)
+
+    def __post_init__(self):
+        db_name = os.getenv("CURADURIA_DB", "curaduria.db")
+        self.db_path = DATA_DIR / db_name
     excel_path: str = field(default_factory=lambda: os.getenv("EXCEL_PATH", str(DATA_DIR / "propuestas_artisticas.xlsx")))
     logo_path: str = field(default_factory=lambda: os.getenv("LOGO_PATH", str(ASSETS_DIR / "CDB_EMPRESA_ASSETS.svg")))
     
