@@ -191,7 +191,7 @@ def cargar_y_consolidar_datos():
 
 
 def calcular_congos_oro(df):
-    """Calcula Congos de Oro por ficha (Top 25%)"""
+    """Calcula Congos de Oro por modalidad (Top 25%)"""
     if df.empty:
         return pd.DataFrame()
     
@@ -295,10 +295,10 @@ def mostrar_congos_oro():
     st.markdown("<br>", unsafe_allow_html=True)
     
     # Tabs
-    tab1, tab2, tab3 = st.tabs(["🏆 Congos de Oro", "📊 Todos los Grupos", "📈 Análisis por Ficha"])
+    tab1, tab2, tab3 = st.tabs(["🏆 Congos de Oro", "📊 Todos los Grupos", "📈 Análisis por Modalidad"])
     
     with tab1:
-        st.markdown("### 🏆 Congos de Oro (Top 25% por Ficha)")
+        st.markdown("### 🏆 Congos de Oro (Top 25% por Modalidad)")
         
         if df_congos.empty:
             st.warning("⚠️ No se pudieron calcular Congos de Oro")
