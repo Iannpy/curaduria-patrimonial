@@ -490,16 +490,3 @@ def mostrar_congos_oro():
                 #'Desv. Std': st.column_config.NumberColumn(format="%.3f"),
             }
         )
-
-# ═══════════════════════════════════════════════════════════════════
-# EJECUCIÓN
-# ═══════════════════════════════════════════════════════════════════
-
-if __name__ == "__main__":
-    st.set_page_config(
-        page_title="Congos de Oro 2026",
-        page_icon="🏆",
-        layout="wide"
-    )
-    
-    mostrar_dashboard()
