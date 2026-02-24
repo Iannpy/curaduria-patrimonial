@@ -44,7 +44,79 @@ def color_gradiente(valor, min_val=0, max_val=2):
     rgb = c1 + frac * (c2 - c1)
     return rgb_to_hex(rgb)
 
+def cuadrado_color_estado(valor):
+    if valor == 2:
+        return f"""**Estado Patrimonial:**
+            <div style="
+                width: 40px;
+                margin-top: 5px;
+                height: 40px;
+                background-color: #1a9850;
+                border-radius: 5px;
+                border: 1.5px solid #D4AF37;
+            "></div>"""
+    else:
+        color_gradiente(valor)
+        return f"""**Estado Patrimonial:**
+            <div style="
+                width: 40px;
+                margin-top: 5px;
+                height: 40px;
+                background-color: {color_gradiente(valor)};
+                border-radius: 5px;
+            "></div>"""
 
+def barra_gradiente(valor):
+    left = max(0, min((valor / 2) * 100, 100))
+    color = color_gradiente(valor)
+    
+    if valor == 2:
+        return """
+        <div style="
+            position: relative;
+            width: 100%;
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 16px 5px 10px;
+            border-radius: 3px;
+            background: linear-gradient(to right, #DA0024, #FFCA00, #1a9850);
+            border: 1.5px solid #D4AF37;
+            box-shadow: 0 0 8px rgba(212,175,55,0.5), 0 2px 6px rgba(0,0,0,0.6);
+        ">
+            <div style="
+                position: absolute;
+                top: -4px; bottom: -4px;
+                width: 3px;
+                left: 100%;
+                background: #D4AF37;
+                border-radius: 3px;
+                box-shadow: 0 0 4px rgba(0,0,0,0.6), 0 0 1px rgba(255,255,255,0.4);
+            "></div>
+        </div>
+        """
+    else:
+        return f"""
+        <div style="
+            position: relative;
+            width: 100%;
+            height: 32px;
+            border-radius: 3px;
+            background: linear-gradient(to right, #DA0024, #FFCA00, #1a9850);
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.35), inset 0 -1px 2px rgba(255,255,255,0.25);
+        ">
+            <div style="
+                position: absolute;
+                top: -4px; bottom: -4px;
+                width: 3px;
+                left: {left}%;
+                background: {color};
+                border-radius: 3px;
+                box-shadow: 0 0 4px rgba(0,0,0,0.6), 0 0 1px rgba(255,255,255,0.4);
+            "></div>
+        </div>
+        """
 
 def mostrar_dashboard(df_eval: pd.DataFrame):
     """Dashboard general con KPIs y gráficos principales mejorados"""
@@ -152,7 +224,7 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
             help="Grupos con promedio ≥ 1.6"
         )
 
-
+    st.markdown(barra_gradiente(promedio_general), unsafe_allow_html=True)
 
     # Estado patrimonial general
     

@@ -14,7 +14,7 @@ from streamlit_option_menu import option_menu
 from .comite.congos_oro_view import mostrar_congos_oro
 from .comite.utils import estado_patrimonial, estado_patrimonial_texto
 from .comite.exports import generar_pdf_grupo, crear_backup_zip
-from .comite.dashboard import mostrar_dashboard, color_gradiente
+from .comite.dashboard import mostrar_dashboard, color_gradiente, barra_gradiente, cuadrado_color_estado
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +51,7 @@ def mostrar_informe_grupo(df_eval: pd.DataFrame, codigo_grupo: str):
     aspectos_evaluados = df_grupo['aspecto'].nunique()
 
     with col1:
-        st.markdown(f"""**Estado Patrimonial**:<div style="
-                width: 40px;
-                height: 40px;
-                background-color: {color};
-                border-radius: 6px
-            "></div>""", unsafe_allow_html=True)
+        st.markdown(f"{cuadrado_color_estado(promedio_grupo)}", unsafe_allow_html=True)
     with col2:
         st.metric("Total Evaluaciones", evaluaciones_total)
     with col3:
@@ -67,6 +62,7 @@ def mostrar_informe_grupo(df_eval: pd.DataFrame, codigo_grupo: str):
 
 
     st.markdown("---")
+    st.markdown(barra_gradiente(promedio_grupo), unsafe_allow_html=True)
 
     # Desempeño por dimensión
     st.subheader("📊 Desempeño por Dimensión")

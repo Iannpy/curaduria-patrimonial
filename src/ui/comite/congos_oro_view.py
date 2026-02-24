@@ -1,9 +1,10 @@
 """
-Vista de Congos de Oro - FIXED para VPS
+Vista de Congos de Oro 
 Usa rutas configurables desde config.py y detecta archivos automáticamente
 """
 import streamlit as st
 import pandas as pd
+import numpy as np
 import sqlite3
 from pathlib import Path
 from src.config import DATA_DIR
@@ -167,11 +168,11 @@ def cargar_y_consolidar_datos():
         
         # Estado patrimonial
         if nota_consolidada < UMBRAL_RIESGO:
-            estado = "🔴 Riesgo"
+            estado = "🔴"
         elif nota_consolidada < UMBRAL_MEJORA:
-            estado = "🟡 Mejora"
+            estado = "🟡"
         else:
-            estado = "🟢 Fortalecimiento"
+            estado = "🟢"
         
         resultados.append({
             'codigo_grupo': codigo,
@@ -188,7 +189,84 @@ def cargar_y_consolidar_datos():
         })
     
     return pd.DataFrame(resultados)
+def asignar_premio(nota, umbral):
+    if pd.isna(nota):
+        return "PARTICIPACIÓN"
 
+    if nota >= umbral:
+        return "CONGO DE ORO"
+    elif nota >= 1.8:
+        return "MEDALLA A LA EXCELENCIA"
+    elif nota >= 1.0:
+        return "HONOR AL FOLCLOR"
+    else:
+        return "PARTICIPACIÓN"
+
+def calcular_premios(df):
+    """
+    Calcula premios por modalidad:
+    - Asigna categoria
+    - Calcula umbral (percentil 75)
+    - Asigna premio según nota
+    - Genera ranking solo para Congos de Oro
+    """
+
+    if df.empty:
+        return pd.DataFrame()
+
+    resultados = []
+
+    for ficha in df['ficha_codigo'].unique():
+        df_ficha = df[df['ficha_codigo'] == ficha].copy()
+
+        # 🔶 Caso especial: CUMBIA por tamaño
+        if ficha == "CUMBIA":
+            for tamano in ['GRANDE', 'MEDIANO']:
+                df_cat = df_ficha[df_ficha['tamano'] == tamano].copy()
+                if df_cat.empty:
+                    continue
+
+                categoria = f'Cumbia {tamano.capitalize()}'
+                umbral = df_cat['nota_consolidada'].quantile(0.75)
+
+                df_cat['categoria'] = categoria
+                df_cat['umbral_congo'] = umbral
+                df_cat['premio'] = df_cat.apply(
+                    lambda r: asignar_premio(
+                        r['nota_consolidada'], umbral
+                    ),
+                    axis=1
+                )
+
+                resultados.append(df_cat)
+
+        # 🔶 Caso general
+        else:
+            categoria = ficha
+            umbral = df_ficha['nota_consolidada'].quantile(0.75)
+
+            df_ficha['categoria'] = categoria
+            df_ficha['umbral_congo'] = umbral
+            df_ficha['premio'] = df_ficha.apply(
+                lambda r: asignar_premio(
+                    r['nota_consolidada'], umbral
+                ),
+                axis=1
+            )
+
+            resultados.append(df_ficha)
+
+    df_final = pd.concat(resultados, ignore_index=True)
+
+    # 🔢 Ranking por categoria
+    df_final = df_final.sort_values(
+        ['categoria', 'nota_consolidada'],
+        ascending=[True, False]
+    )
+
+    df_final['ranking'] = df_final.groupby('categoria').cumcount() + 1
+
+    return df_final
 
 def calcular_congos_oro(df):
     """Calcula Congos de Oro por modalidad (Top 25%)"""
@@ -241,8 +319,24 @@ def mostrar_congos_oro():
         else:
             st.error("❌ No se encontró BD de Gran Parada")
     """
-    st.title("🏆 Congos de Oro - Consolidado 2026")
-    st.markdown("---")
+    st.title("🏆 Premiación - Consolidado 2026")
+    with st.expander("ℹ️ Detalles de Premios", expanded=False):
+        st.markdown("""
+                    <div style="
+                        background-color: white;
+                        padding: 16px;
+                        border-radius: 14px;
+                        border: 1px solid #E5E7EB;
+                        margin-bottom: 12px;
+                    ">
+                    <b>Listado de Premios</b>
+                    <p style="margin-top: 8px;">
+                    <span style="font-size: 18px;">🏆</span> <b>CONGO DE ORO:</b> Top 25% por modalidad<br>
+                    <span style="font-size: 18px;">🥇</span> <b>MEDALLA A LA EXCELENCIA:</b> Nota ≥ 1.8<br>
+                    <span style="font-size: 18px;">📜</span> <b>HONOR AL FOLCLOR:</b> Nota ≥ 1.0<br>
+                    <span style="font-size: 18px;">🎭</span> <b>PARTICIPACIÓN:</b> Nota < 1.0 o participación en solo un evento<br>
+                    </div>
+                    """, unsafe_allow_html=True)
     # Cargar datos
     with st.spinner("Cargando datos..."):
         df = cargar_y_consolidar_datos()
@@ -252,6 +346,7 @@ def mostrar_congos_oro():
             st.info("💡 Verifica que existan archivos .db en la carpeta data/")
             return
         
+        df = calcular_premios(df)
         df_congos = calcular_congos_oro(df)
     
     # KPIs principales
@@ -278,16 +373,16 @@ def mostrar_congos_oro():
                     border-radius: 6px
                 "></div>""", unsafe_allow_html=True)
     with col4:
-        riesgo = len(df[df['estado'] == "🔴 Riesgo"])
+        riesgo = len(df[df['estado'] == "🔴"])
         st.metric("🔴 Riesgo", riesgo, 
                  delta=f"{riesgo/len(df)*100:.0f}%")
     with col5:
-        mejora = len(df[df['estado'] == "🟡 Mejora"])
+        mejora = len(df[df['estado'] == "🟡"])
         st.metric("🟡 Mejora", mejora, 
                     delta=f"{mejora/len(df)*100:.0f}%")
     
     with col6:
-        fortalecimiento = len(df[df['estado'] == "🟢 Fortalecimiento"])
+        fortalecimiento = len(df[df['estado'] == "🟢"])
         st.metric("🟢 Fortalecimiento", fortalecimiento,
                  delta=f"{fortalecimiento/len(df)*100:.0f}%")
     
@@ -300,25 +395,54 @@ def mostrar_congos_oro():
     with tab1:
         st.markdown("### 🏆 Congos de Oro (Top 25% por Modalidad)")
         
-        if df_congos.empty:
+        if df.empty:
             st.warning("⚠️ No se pudieron calcular Congos de Oro")
             return
         
         # Filtro por categoría
-        categorias = ['Todas'] + sorted(df_congos['categoria'].unique().tolist())
-        categoria_sel = st.selectbox("Filtrar por categoría:", categorias)
+
+        col_f1, col_f2, colf3 = st.columns(3)
+        with col_f1:
+            categorias = ['Todas'] + sorted(df['categoria'].unique().tolist())
+            categoria_sel = st.selectbox("Filtrar por categoría:", categorias)
         
         if categoria_sel != 'Todas':
-            df_mostrar = df_congos[df_congos['categoria'] == categoria_sel]
+            df_mostrar = df[df['categoria'] == categoria_sel]
         else:
-            df_mostrar = df_congos
+            df_mostrar = df
+        
+        with col_f2:
+            premios_list = ['Todos', 'CONGO DE ORO', 'MEDALLA A LA EXCELENCIA', 'HONOR AL FOLCLOR', 'PARTICIPACIÓN']
+            premio_sel = st.selectbox("Filtrar por premio:", premios_list) 
+        if premio_sel != 'Todos':
+            df_mostrar = df_mostrar[df_mostrar['premio'] == premio_sel]
+        else:
+            df_mostrar = df_mostrar
+
+        with colf3:
+            estado_list = ['Todos', '🟢', '🟡', '🔴']
+            estado_sel = st.selectbox("Filtrar por estado:", estado_list)
+        if estado_sel != 'Todos':
+            df_mostrar = df_mostrar[df_mostrar['estado'] == estado_sel]
+        else:
+            df_mostrar = df_mostrar
+        
+        premio_display = {
+            "CONGO DE ORO": "🏆",
+            "MEDALLA A LA EXCELENCIA": "🥇",
+            "HONOR AL FOLCLOR": "📜",
+            "PARTICIPACIÓN": "🎭"
+        }
+        
+        df_mostrar['premio_display'] = df_mostrar['premio'].apply(
+            lambda x: premio_display.get(x, x))
         
         # Tabla
         st.dataframe(
             df_mostrar[[
                 'ranking', 'categoria', 'codigo_grupo', 'nombre_propuesta',
-                'nota_consolidada', 'promedio_fin', 'promedio_gran', 
-                'estado', 'participacion'
+                'nota_consolidada', 'promedio_fin', 'promedio_gran', 'premio_display',
+                'estado','participacion'
             ]],
             use_container_width=True,
             hide_index=True,
@@ -327,9 +451,10 @@ def mostrar_congos_oro():
                 'categoria': 'Categoría',
                 'codigo_grupo': 'Código',
                 'nombre_propuesta': 'Nombre',
-                'nota_consolidada': st.column_config.NumberColumn('Nota Final', format="%.3f"),
-                'promedio_fin': st.column_config.NumberColumn('Fin de Semana', format="%.3f"),
-                'promedio_gran': st.column_config.NumberColumn('Gran Parada', format="%.3f"),
+                'premio_display': 'Premio',
+                'nota_consolidada': st.column_config.NumberColumn('Nota Final', format="%.2f"),
+                'promedio_fin': st.column_config.NumberColumn('Fin de Semana', format="%.2f"),
+                'promedio_gran': st.column_config.NumberColumn('Gran Parada', format="%.2f"),
                 'estado': 'Estado',
                 'participacion': 'Eventos'
             }
@@ -452,10 +577,18 @@ def mostrar_congos_oro():
                             'Ficha': f'Cumbia {tamano.capitalize()}',
                             'Total': len(df_tam),
                             'Congos de Oro': len(df_oro),
+                            'Medalla a la Excelencia': len(df_tam[df_tam['premio'] == "MEDALLA A LA EXCELENCIA"]),
+                            'Honor al Folclor': len(df_tam[df_tam['premio'] == "HONOR AL FOLCLOR"]),
+                            'Participación': len(df_tam[df_tam['premio'] == "PARTICIPACIÓN"]),
+                            #'% Congos de Oro': len(df_oro)/len(df_tam)*100 if len(df_tam) > 0 else 0,
                             'Promedio': df_tam['nota_consolidada'].mean(),
-                            '🟢' : len(df_tam[df_tam['estado'] == "🟢 Fortalecimiento"]),
-                            '🟡' : len(df_tam[df_tam['estado'] == "🟡 Mejora"]),
-                            '🔴' : len(df_tam[df_tam['estado'] == "🔴 Riesgo"]),
+                            'Umbral': df_tam['nota_consolidada'].quantile(0.75),
+                            '🟢' : len(df_tam[df_tam['estado'] == "🟢"]),
+                            #'🟢%' : len(df_tam[df_tam['estado'] == "🟢 Fortalecimiento"])/len(df_tam)*100 if len(df_tam) > 0 else 0,
+                            '🟡' : len(df_tam[df_tam['estado'] == "🟡"]),
+                            #'🟡%' : len(df_tam[df_tam['estado'] == "🟡 Mejora"])/len(df_tam)*100 if len(df_tam) > 0 else 0,
+                            '🔴' : len(df_tam[df_tam['estado'] == "🔴"]),
+                            #'🔴%' : len(df_tam[df_tam['estado'] == "🔴 Riesgo"])/len(df_tam)*100 if len(df_tam) > 0 else 0,
                             #'Máximo': df_tam['nota_consolidada'].max(),
                             #'Mínimo': df_tam['nota_consolidada'].min(),
                             #'Desv. Std': df_tam['nota_consolidada'].std()
@@ -466,10 +599,17 @@ def mostrar_congos_oro():
                     'Ficha': ficha,
                     'Total': len(df_ficha),
                     'Congos de Oro': len(df_oro),
+                    'Medalla a la Excelencia': len(df_ficha[df_ficha['premio'] == "MEDALLA A LA EXCELENCIA"]),
+                    'Honor al Folclor': len(df_ficha[df_ficha['premio'] == "HONOR AL FOLCLOR"]),
+                    'Participación': len(df_ficha[df_ficha['premio'] == "PARTICIPACIÓN"]),
                     'Promedio': df_ficha['nota_consolidada'].mean(),
-                    '🟢' : len(df_ficha[df_ficha['estado'] == "🟢 Fortalecimiento"]),
-                    '🟡' : len(df_ficha[df_ficha['estado'] == "🟡 Mejora"]),
-                    '🔴' : len(df_ficha[df_ficha['estado'] == "🔴 Riesgo"]),
+                    'Umbral': df_ficha['nota_consolidada'].quantile(0.75),
+                    '🟢' : len(df_ficha[df_ficha['estado'] == "🟢"]),
+                    #'🟢%' : len(df_ficha[df_ficha['estado'] == "🟢 Fortalecimiento"])/len(df_ficha)*100 if len(df_ficha) > 0 else 0,
+                    '🟡' : len(df_ficha[df_ficha['estado'] == "🟡"]),
+                    #'🟡%' : len(df_ficha[df_ficha['estado'] == "🟡 Mejora"])/len(df_ficha)*100 if len(df_ficha) > 0 else 0,
+                    '🔴' : len(df_ficha[df_ficha['estado'] == "🔴"]),
+                    #'🔴%' : len(df_ficha[df_ficha['estado'] == "🔴 Riesgo"])/len(df_ficha)*100 if len(df_ficha) > 0 else 0,
                     #'Máximo': df_ficha['nota_consolidada'].max(),
                     #'Mínimo': df_ficha['nota_consolidada'].min(),
                     #'Desv. Std': df_ficha['nota_consolidada'].std()
@@ -484,7 +624,20 @@ def mostrar_congos_oro():
             use_container_width=True,
             hide_index=True,
             column_config={
-                'Promedio': st.column_config.NumberColumn(format="%.3f"),
+                'Promedio': st.column_config.NumberColumn(format="%.2f"),
+                'Umbral': st.column_config.NumberColumn(format="%.2f"),
+                #'% Congos de Oro': st.column_config.NumberColumn(format="%.0f%%"),
+                'Total': st.column_config.NumberColumn(format="%d"),
+                'Congos de Oro': st.column_config.NumberColumn(label="🏆", format="%d"),
+                'Medalla a la Excelencia': st.column_config.NumberColumn(label="🥇", format="%d"),
+                'Honor al Folclor': st.column_config.NumberColumn(label="📜", format="%d"),
+                'Participación': st.column_config.NumberColumn(label="🎭", format="%d"),
+                '🟢': st.column_config.NumberColumn(format="%d"),
+                #'🟢%': st.column_config.NumberColumn(format="%.0f%%"),
+                '🟡': st.column_config.NumberColumn(format="%d"),
+                #'🟡%': st.column_config.NumberColumn(format="%.0f%%"),
+                '🔴': st.column_config.NumberColumn(format="%d"),
+                #'🔴%': st.column_config.NumberColumn(format="%.0f%%"),
                 #'Máximo': st.column_config.NumberColumn(format="%.3f"),
                 #'Mínimo': st.column_config.NumberColumn(format="%.3f"),
                 #'Desv. Std': st.column_config.NumberColumn(format="%.3f"),
