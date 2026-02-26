@@ -319,24 +319,8 @@ def mostrar_congos_oro():
         else:
             st.error("❌ No se encontró BD de Gran Parada")
     """
-    st.title("🏆 Premios - Consolidado 2026")
-    with st.expander("ℹ️ Detalles de Premios", expanded=False):
-        st.markdown("""
-                    <div style="
-                        background-color: white;
-                        padding: 16px;
-                        border-radius: 14px;
-                        border: 1px solid #E5E7EB;
-                        margin-bottom: 12px;
-                    ">
-                    <b>Listado de Premios</b>
-                    <p style="margin-top: 8px;">
-                    <span style="font-size: 18px;">🏆</span> <b>CONGO DE ORO:</b> Top 25% por modalidad<br>
-                    <span style="font-size: 18px;">🥇</span> <b>MEDALLA A LA EXCELENCIA:</b> Nota ≥ 1.8<br>
-                    <span style="font-size: 18px;">📜</span> <b>HONOR AL FOLCLOR:</b> Nota ≥ 1.0<br>
-                    <span style="font-size: 18px;">🎭</span> <b>PARTICIPACIÓN:</b> Nota < 1.0 o participación en solo un evento<br>
-                    </div>
-                    """, unsafe_allow_html=True)
+    st.title("🏆 Congos de Oro - Consolidado 2026")
+    st.markdown("---")
     # Cargar datos
     with st.spinner("Cargando datos..."):
         df = cargar_y_consolidar_datos()
