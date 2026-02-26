@@ -374,10 +374,10 @@ def mostrar_congos_oro():
     st.markdown("<br>", unsafe_allow_html=True)
     
     # Tabs
-    tab1, tab2, tab3 = st.tabs(["🏆 Congos de Oro", "📊 Todos los Grupos", "📈 Análisis por Modalidad"])
+    tab1, tab2, tab3 = st.tabs(["🏆 Listado de premios", "📊 Todos los Grupos", "📈 Análisis por Modalidad"])
     
     with tab1:
-        st.markdown("### 🏆 Congos de Oro (Top 25% por Modalidad)")
+        st.markdown("### 🏆 Listado de Premios")
         
         if df.empty:
             st.warning("⚠️ No se pudieron calcular Congos de Oro")
@@ -428,6 +428,7 @@ def mostrar_congos_oro():
                 'nota_consolidada', 'promedio_fin', 'promedio_gran', 'premio_display',
                 'estado','participacion'
             ]],
+            height=35 * len(df_mostrar) + 40,
             use_container_width=True,
             hide_index=True,
             column_config={
