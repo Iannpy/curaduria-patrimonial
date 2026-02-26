@@ -96,6 +96,10 @@ def main():
         from src.ui.comite_view import mostrar_vista_comite
         mostrar_vista_comite()
     
+    elif AuthManager.es_admin():
+        from src.ui.administrador_view import mostrar_vista_comite
+        mostrar_vista_comite()
+    
     else:
         st.error("⚠️ Rol no reconocido")
         if st.button("Cerrar Sesión"):

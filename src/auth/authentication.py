@@ -173,6 +173,15 @@ class AuthManager:
             True si es comité, False en caso contrario
         """
         return st.session_state.get("rol") == "comite"
+    @staticmethod
+    def es_admin() -> bool:
+        """
+        Verifica si el usuario actual es administrador.
+        
+        Returns:
+            True si es admin, False en caso contrario
+        """
+        return st.session_state.get("rol") == "administrador"
     
     @staticmethod
     def requiere_autenticacion():
