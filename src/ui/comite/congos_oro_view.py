@@ -319,8 +319,17 @@ def mostrar_congos_oro():
         else:
             st.error("❌ No se encontró BD de Gran Parada")
     """
-    st.title("🏆 Congos de Oro - Consolidado 2026")
-    st.markdown("---")
+    colg1, colg2 = st.columns([4, 2])
+    with colg1:
+        st.title("🏆 Premios - Consolidado 2026")
+    with colg2: 
+        with st.expander("ℹ️ Detalles de los premios", expanded=False, width=700):
+            st.markdown("""
+            - **🏆Congo de Oro**: Top 25% de cada modalidad
+            - **🥇Medalla a la Excelencia**: Grupos con nota >= 1.8
+            - **📜Honor al Folclor**: Grupos con nota >= 1.0
+            - **🎭Participación**: Grupos evaluados que no obtuvieron premio
+            """)
     # Cargar datos
     with st.spinner("Cargando datos..."):
         df = cargar_y_consolidar_datos()
@@ -334,7 +343,7 @@ def mostrar_congos_oro():
         df_congos = calcular_congos_oro(df)
     
     # KPIs principales
-    st.markdown("### 📊 Métricas Generales")
+   
     
     col1, col2, col3, col4, col5, col6 = st.columns(6)
     
@@ -359,16 +368,16 @@ def mostrar_congos_oro():
     with col4:
         riesgo = len(df[df['estado'] == "🔴"])
         st.metric("🔴 Riesgo", riesgo, 
-                 delta=f"{riesgo/len(df)*100:.0f}%")
+                 delta=f"{riesgo/len(df)*100:.0f}%",help="Cantidad de grupos que se encuentran en riesgo patrimonial")
     with col5:
         mejora = len(df[df['estado'] == "🟡"])
         st.metric("🟡 Mejora", mejora, 
-                    delta=f"{mejora/len(df)*100:.0f}%")
+                    delta=f"{mejora/len(df)*100:.0f}%", help="Cantidad de grupos que requieren acciones de mejora para fortalecer su patrimonio")
     
     with col6:
         fortalecimiento = len(df[df['estado'] == "🟢"])
         st.metric("🟢 Fortalecimiento", fortalecimiento,
-                 delta=f"{fortalecimiento/len(df)*100:.0f}%")
+                 delta=f"{fortalecimiento/len(df)*100:.0f}%", help="Cantidad de grupos que se encuentran fortalecidos patrimonialmente")
     
     #espacio en blanco
     st.markdown("<br>", unsafe_allow_html=True)
