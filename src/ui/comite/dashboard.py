@@ -181,7 +181,7 @@ def seleccionador_eventos():
             "Evento a visualizar:",
             [
                 "🎪 Fin de Semana de la Tradición",
-                "🎊 Gran Parada de Tradición"
+                "🎊 Gran Parada de Tradición y Fantasía"
             ],
             key="selector_evento_dashboard"
         )
