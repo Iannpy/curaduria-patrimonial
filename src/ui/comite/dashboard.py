@@ -207,7 +207,7 @@ def seleccionador_eventos():
 
 def mostrar_dashboard(df_eval: pd.DataFrame):
     """Dashboard general con KPIs y gráficos principales mejorados"""
-    seleccionador_eventos()
+    df_eval = seleccionador_eventos()
     
     if df_eval.empty:
         st.warning("⚠️ No hay evaluaciones registradas todavía")
