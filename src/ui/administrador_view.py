@@ -14,7 +14,7 @@ from streamlit_option_menu import option_menu
 from .comite.congos_oro_view import mostrar_congos_oro
 from .comite.utils import estado_patrimonial, estado_patrimonial_texto
 from .comite.exports import generar_pdf_grupo, crear_backup_zip
-from .comite.dashboard import mostrar_dashboard, color_gradiente, barra_gradiente, cuadrado_color_estado
+from .comite.dashboard import mostrar_dashboard, color_gradiente, barra_gradiente, cuadrado_color_estado, seleccionador_eventos
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ def mostrar_informe_grupo(df_eval: pd.DataFrame, codigo_grupo: str):
     st.success(f"✅ Informe encontrado para: **{grupo_info['nombre_propuesta']}** ({codigo_grupo})")
 
     # Métricas principales del grupo
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2 = st.columns([1, 4])
    
     promedio_grupo = df_grupo['resultado'].mean()
     color = color_gradiente(promedio_grupo)
@@ -53,16 +53,8 @@ def mostrar_informe_grupo(df_eval: pd.DataFrame, codigo_grupo: str):
     with col1:
         st.markdown(f"{cuadrado_color_estado(promedio_grupo)}", unsafe_allow_html=True)
     with col2:
-        st.metric("Total Evaluaciones", evaluaciones_total)
-    with col3:
-        st.metric("Curadores", curadores_unicos)
-    with col4:
-        st.metric("Aspectos Evaluados", aspectos_evaluados)
-
-
-
-    st.markdown("---")
-    st.markdown(barra_gradiente(promedio_grupo), unsafe_allow_html=True)
+        #espacio para el gráfico de barra de color
+        st.markdown(f"**Indicador del estado:**{barra_gradiente(promedio_grupo)}", unsafe_allow_html=True)
 
     # Desempeño por dimensión
     st.subheader("📊 Desempeño por Dimensión")
@@ -140,31 +132,6 @@ def mostrar_informe_grupo(df_eval: pd.DataFrame, codigo_grupo: str):
         }
     )
     
-    """
-    # Evaluaciones detalladas
-    st.subheader("📋 Evaluaciones Detalladas")
-
-    df_detalle = df_grupo[[
-        'curador',
-        'dimension',
-        'aspecto',
-        'observacion',
-        'fecha_registro'
-    ]].copy()
-
-    # Emoji basado en resultado (se calcula antes)
-    df_detalle['resultado_emoji'] = df_grupo['resultado'].map({2: '🟢', 1: '🟡', 0: '🔴'})
-
-    st.dataframe(
-        df_detalle.sort_values('fecha_registro', ascending=False),
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            'resultado_emoji': st.column_config.TextColumn('Estado'),
-            'fecha_registro': st.column_config.DatetimeColumn('Fecha', format='DD/MM/YYYY HH:mm')
-        }
-    )
-    """
     
     # Observaciones cualitativas
     st.subheader("💬 Observaciones Cualitativas")
@@ -283,7 +250,7 @@ def mostrar_vista_comite():
 
 def mostrar_evaluaciones_detalladas(df_eval: pd.DataFrame) -> None:
     """Tabla detallada de todas las evaluaciones"""
-    
+    df_eval =  seleccionador_eventos()
     st.header("📋 Evaluaciones Detalladas")
     st.caption("Vista completa de todas las evaluaciones por aspecto")
     
@@ -386,6 +353,8 @@ def mostrar_analisis_grupos(df_eval: pd.DataFrame):
 
     st.header("🎭 Análisis por Grupos")
     st.caption("Vista consolidada del desempeño de cada grupo")
+
+    df_eval =  seleccionador_eventos()
 
     if df_eval.empty:
         st.warning("⚠️ No hay evaluaciones para analizar por grupos")

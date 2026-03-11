@@ -6,8 +6,10 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 import numpy as np
+import sqlite3
+from pathlib import Path
 from .utils import estado_patrimonial
-from src.config import config
+from src.config import config, DATA_DIR
 
 def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip('#')
@@ -118,12 +120,94 @@ def barra_gradiente(valor):
         </div>
         """
 
+@st.cache_data(ttl=60)
+def cargar_evaluaciones_desde_db(db_path: str):
+    """
+    Carga evaluaciones desde una base de datos específica
+    
+    Args:
+        db_path: Ruta al archivo .db
+    
+    Returns:
+        DataFrame con evaluaciones
+    """
+    if not Path(db_path).exists():
+        st.error(f"❌ Base de datos no encontrada: {db_path}")
+        return pd.DataFrame()
+    
+    try:
+        conn = sqlite3.connect(db_path)
+        
+        query = """
+            SELECT 
+                e.id,
+                u.username as curador,
+                e.codigo_grupo,
+                g.nombre_propuesta,
+                g.modalidad,
+                g.tipo,
+                f.nombre as ficha,
+                fg.nombre as ficha_grupo,
+                d.nombre as dimension,
+                a.nombre as aspecto,
+                e.resultado,
+                e.observacion,
+                e.fecha_registro
+            FROM evaluaciones e
+            LEFT JOIN usuarios u ON e.usuario_id = u.id
+            LEFT JOIN grupos g ON e.codigo_grupo = g.codigo
+            LEFT JOIN fichas f ON e.ficha_id = f.id
+            LEFT JOIN fichas fg ON g.ficha_id = fg.id
+            JOIN aspectos a ON e.aspecto_id = a.id
+            JOIN dimensiones d ON a.dimension_id = d.id
+            ORDER BY e.fecha_registro DESC
+        """
+        
+        df = pd.read_sql_query(query, conn)
+        conn.close()
+        
+        return df
+        
+    except Exception as e:
+        st.error(f"❌ Error cargando datos: {e}")
+        return pd.DataFrame()
+def seleccionador_eventos():
+    st.markdown("### Seleccionar Evento")
+    
+    col_selector, col_info = st.columns([2, 1])
+    
+    with col_selector:
+        evento_seleccionado = st.selectbox(
+            "Evento a visualizar:",
+            [
+                "🎪 Fin de Semana de la Tradición",
+                "🎊 Gran Parada de Tradición"
+            ],
+            key="selector_evento_dashboard"
+        )
+    
+    with col_info:
+        st.info(f"📅 **Mostrando:** {evento_seleccionado}")
+    
+    # Mapear selección a archivo de BD
+    if "Fin de Semana" in evento_seleccionado:
+        db_path = str(DATA_DIR / "curaduria_finde.db")
+        evento_nombre = "Fin de Semana de la Tradición"
+    else:
+        db_path = str(DATA_DIR / "curaduria_granparada.db")
+        evento_nombre = "Gran Parada de Tradición"
+    
+    # Cargar datos del evento seleccionado
+    
+    with st.spinner(f"Cargando datos de {evento_nombre}..."):
+        df_eval = cargar_evaluaciones_desde_db(db_path)
+    
+    return df_eval
+
+
 def mostrar_dashboard(df_eval: pd.DataFrame):
     """Dashboard general con KPIs y gráficos principales mejorados"""
-
-    
-    st.header("📊 Dashboard General")
-   
+    seleccionador_eventos()
     
     if df_eval.empty:
         st.warning("⚠️ No hay evaluaciones registradas todavía")
@@ -151,7 +235,6 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
     # ============================================================
     # KPIs PRINCIPALES - Mejorados
     # ============================================================
-    st.markdown("---")
     st.subheader("📈 Métricas Clave")
     
     total_evaluaciones = len(df_eval)
@@ -226,56 +309,11 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
 
     st.markdown(barra_gradiente(promedio_general), unsafe_allow_html=True)
 
-    # Estado patrimonial general
-    
-    
-
-    """
-    # ============================================================
-    # ANÁLISIS ESTADÍSTICO PROFUNDO
-    # ============================================================
-    st.markdown("---")
-    st.subheader("📊 Análisis Estadístico")
-    
-    col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
-    
-    with col_stat1:
-        mediana = df_promedios['promedio_final'].median()
-        st.metric("Mediana", f"{mediana:.2f}")
-    
-    with col_stat2:
-        q25 = df_promedios['promedio_final'].quantile(0.25)
-        st.metric("Q1 (25%)", f"{q25:.2f}")
-    
-    with col_stat3:
-        q75 = df_promedios['promedio_final'].quantile(0.75)
-        st.metric("Q3 (75%)", f"{q75:.2f}")
-    
-    with col_stat4:
-        rango = df_promedios['promedio_final'].max() - df_promedios['promedio_final'].min()
-        st.metric("Rango", f"{rango:.2f}")
-    
-    # Box plot de distribución
-    st.markdown("**Distribución de Promedios:**")
-    chart_box = alt.Chart(df_promedios).mark_boxplot(extent='min-max').encode(
-        y=alt.Y('promedio_final:Q', title='Promedio', scale=alt.Scale(domain=[0, 2])),
-        color=alt.value('#1f77b4')
-    ).properties(height=150)
-    
-    st.altair_chart(chart_box, use_container_width=True)
-    
-    
-    
-    if curadores_activos > 0:
-        evaluaciones_por_curador = total_evaluaciones / curadores_activos
-        aspectos_por_grupo = total_evaluaciones / grupos_evaluados if grupos_evaluados > 0 else 0
-        st.info(f"📊 **Productividad:** {evaluaciones_por_curador:.1f} observaciones/curador | {aspectos_por_grupo:.1f} aspectos/grupo")
-    """
     # ============================================================
     # ANÁLISIS POR FICHA 
     # ============================================================
     st.markdown("---")
-    st.subheader("📊 Análisis por Ficha de Evaluación")
+    st.subheader("📊 Análisis por Modalidad")
     
     if 'ficha' in df_promedios.columns and df_promedios['ficha'].notna().any():
         df_ficha = (df_promedios
@@ -338,27 +376,6 @@ def mostrar_dashboard(df_eval: pd.DataFrame):
                 
             }
         )
-        """
-        # Tabla detallada con más métricas
-        st.dataframe(
-            df_ficha.style.format({
-                'promedio': '{:.2f}',
-                #'desviacion': '{:.2f}',
-                #'min_promedio': '{:.2f}',
-                #'max_promedio': '{:.2f}'
-            }),
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                'ficha': 'Ficha',
-                'promedio': st.column_config.NumberColumn('Promedio', format='%.2f'),
-                'cantidad': st.column_config.NumberColumn('Grupos', format='%d'),
-               # 'desviacion': st.column_config.NumberColumn('Desv. Est.', format='%.2f'),
-               # 'min_promedio': st.column_config.NumberColumn('Mínimo', format='%.2f'),
-               # 'max_promedio': st.column_config.NumberColumn('Máximo', format='%.2f')
-            }
-        )
-        """
     else:
         st.warning("⚠️ No hay información de fichas disponible en los datos")
     
