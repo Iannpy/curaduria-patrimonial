@@ -2,6 +2,8 @@
 Vista de Congos de Oro 
 Usa rutas configurables desde config.py y detecta archivos automáticamente
 """
+from io import BytesIO
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -434,7 +436,7 @@ def mostrar_congos_oro():
         st.dataframe(
             df_mostrar[[
                 'ranking', 'categoria', 'codigo_grupo', 'nombre_propuesta',
-                'nota_consolidada', 'promedio_fin', 'promedio_gran', 'premio_display',
+                'nota_consolidada', 'promedio_fin', 'promedio_gran', 'premio_display', 'premio',
                 'estado','participacion'
             ]],
             height=35 * len(df_mostrar) + 40,
@@ -450,19 +452,40 @@ def mostrar_congos_oro():
                 'promedio_fin': st.column_config.NumberColumn('Fin de Semana', format="%.2f"),
                 'promedio_gran': st.column_config.NumberColumn('Gran Parada', format="%.2f"),
                 'estado': 'Estado',
-                'participacion': 'Eventos'
+                'participacion': 'Eventos',
+                'premio': 'Premio Detallado'
             }
         )
         
-        # Botón de exportación
-        csv = df_mostrar.to_csv(index=False)
-        st.download_button(
-            label="📥 Descargar CSV",
-            data=csv,
-            file_name=f"congos_oro_{categoria_sel.lower().replace(' ', '_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv"
-        )
+        col_exp1, col_exp2, col_exp3 = st.columns(3)
     
+        with col_exp1:
+            # Exportar a Excel
+            excel_buffer = BytesIO()
+            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                df_mostrar.to_excel(writer, sheet_name='Evaluaciones', index=False)
+            
+            st.download_button(
+                label="📥 Exportar Excel",
+                data=excel_buffer.getvalue(),
+                file_name=f"consolidado_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                type="primary",
+                use_container_width=True
+            )
+
+        with col_exp2:
+            # Exportar a CSV
+            csv_data = df_mostrar.to_csv(index=False)
+            st.download_button(
+                label="📥 Exportar CSV",
+                data=csv_data,
+                file_name=f"consolidado_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                type="secondary",
+                use_container_width=True
+            )
+        
     with tab2:
             st.markdown("""
             <div style="
